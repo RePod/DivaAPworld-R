@@ -1,0 +1,41 @@
+diff --git a/MegaMixCollection.py b/MegaMixCollection.py
+index beeac7a..c7d0195 100644
+--- a/MegaMixCollection.py
++++ b/MegaMixCollection.py
+@@ -36,19 +36,7 @@ class MegaMixCollections:
+         }
+
+         # Define paths
+-        archipelago_path = "../Archipelago"
+-        diva_path = os.path.join(archipelago_path, "diva")
+-
+-        # Check if Archipelago folder exists
+-        if os.path.exists(archipelago_path):
+-            # Check if diva folder exists, if not create it
+-            if not os.path.exists(diva_path):
+-                os.makedirs(diva_path)
+-                print(f"Created 'diva' folder in {archipelago_path}")
+-            else:
+-                print(f"'diva' folder already exists in {archipelago_path}")
+-        else:
+-            print("The 'Archipelago' folder does not exist.")
++        diva_path = "./diva"
+
+         json_data = load_zipped_json_file("songData.json")
+         modded_json_files = load_all_modded_json_files(diva_path)
+diff --git a/DataHandler.py b/DataHandler.py
+index ee19996..e612fae 100644
+--- a/DataHandler.py
++++ b/DataHandler.py
+@@ -42,6 +42,11 @@ def select_json_file():
+ def load_all_modded_json_files(directory: str) -> List[Dict[str, Any]]:
+     """Loads all JSON files from the given directory and returns their content along with filenames"""
+     modded_data = []
++
++    if not os.path.isdir(directory):
++        print(f"{directory} not found/directory. Continuing without modded songs.")
++        return []
++
+     for filename in os.listdir(directory):
+         if filename.endswith(".json"):
+             filepath = os.path.join(directory, filename)
