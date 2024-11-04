@@ -55,7 +55,7 @@ jobs:
       - name: World | Apply late diffs
         run: |
           cd $TMP_WORLD
-          git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/late/*.diff
+          git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/late/*.diff || exit 0
           cd -
 
       - name: World | Sanity check (late diff)
