@@ -20,7 +20,7 @@ index 6e86590..335fd68 100644
                  self.modded = True
                  self.mod_pv_list = generate_modded_paths(self.modData, self.path)
 diff --git a/DataHandler.py b/DataHandler.py
-index 6368ac6..4a61354 100644
+index 6368ac6..283ef05 100644
 --- a/DataHandler.py
 +++ b/DataHandler.py
 @@ -1,4 +1,5 @@
@@ -51,12 +51,12 @@ index 6368ac6..4a61354 100644
                      # Process each mod_data block
                      for mod_data_content in matches:
 +                        mod_data_match = yaml.safe_load(file_content)
-+                        mod_data_content = mod_data_match.get("Hatsune Miku Project Diva Mega Mix+", {}).get("megamix_mod_data")
++                        mod_data_content = mod_data_match.get("Hatsune Miku Project Diva Mega Mix+", {}).get("megamix_mod_data", '""')
  
 -                        data_dict = get_dict(mod_data_content, False)
 -
 -                        if data_dict == "":
-+                        if not mod_data_content:
++                        if isinstance(mod_data_content, dict) or not mod_data_content:
                              continue
  
 -                        all_mod_data.append(data_dict)
