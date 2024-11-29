@@ -1,9 +1,9 @@
 diff --git a/DataHandler.py b/DataHandler.py
-index f305d14..bb623fa 100644
+index 6368ac6..5b35d62 100644
 --- a/DataHandler.py
 +++ b/DataHandler.py
 @@ -167,8 +167,8 @@ def erase_song_list(file_paths):
-
+ 
          # Perform replacements
          for i, line in enumerate(file_data):
 -            if line.startswith("pv_144") or line.startswith("pv_700") or line.startswith(
