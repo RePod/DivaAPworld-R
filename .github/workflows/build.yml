@@ -24,7 +24,9 @@ jobs:
       - name: Archipelago | Setup
         run: |
           cd /tmp
-          git clone https://github.com/ArchipelagoMW/Archipelago    
+          git clone https://github.com/ArchipelagoMW/Archipelago
+          cd $ARCHIPELAGO
+          pip install -r requirements.txt
 
       - name: World | Setup
         run: |
