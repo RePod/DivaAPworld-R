@@ -26,7 +26,10 @@ jobs:
           cd /tmp
           git clone https://github.com/ArchipelagoMW/Archipelago
           cd $ARCHIPELAGO
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install pytest pytest-subtests pytest-xdist
+          python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
+          python Launcher.py --update_settings  # make sure host.yaml exists for tests
 
       - name: World | Setup
         run: |
@@ -67,7 +70,7 @@ jobs:
       - name: World | General tests
         run: |
           cd $ARCHIPELAGO
-          python -m pytest test/general worlds/megamix
+          pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
