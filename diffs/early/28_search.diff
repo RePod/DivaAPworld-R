@@ -1,18 +1,5 @@
-diff --git a/Options.py b/Options.py
-index cfe3247..89ccfdd 100644
---- a/Options.py
-+++ b/Options.py
-@@ -177,7 +177,7 @@ class ModData(FreeText):
-     """If you are using modded songs, delete the option below entirely and paste the string from the DivaJSON Tool here"""
-     display_name = "MegaMixModData"
-     default = ''
--    visibility = 0b1001
-+    visibility = Visibility.template | Visibility.spoiler
- 
- 
- @dataclass
 diff --git a/__init__.py b/__init__.py
-index b5bb357..834f82e 100644
+index 640247a..834f82e 100644
 --- a/__init__.py
 +++ b/__init__.py
 @@ -76,26 +76,19 @@ class MegaMixWorld(World):
@@ -38,7 +25,7 @@ index b5bb357..834f82e 100644
 -                raise ValueError(f"Not enough songs available. Need at least {self.options.starting_song_count + self.options.additional_song_count + 1}")
 -
 -            # Handle goal ID
--            self.victory_song_id = available_song_keys[chosen_song_index].songID
+-            self.victory_song_id = available_song_keys[chosen_song_index].songID * 10
 -            del available_song_keys[chosen_song_index]
 +            allowed_difficulties = list(range(lower_diff_threshold, higher_diff_threshold + 1))
 +            available_song_keys = self.mm_collection.get_songs_with_settings(self.options.allow_megamix_dlc_songs, get_player_specific_ids(self.options.megamix_mod_data.value), allowed_difficulties, disallowed_singers, lower_rating_threshold, higher_rating_threshold)

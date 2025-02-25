@@ -345,30 +345,4 @@ index dc131f4..bd16a0e 100644
 +
  def get_player_specific_ids(mod_data):
      song_ids = []  # Initialize an empty list to store song IDs
- 
-diff --git a/Options.py b/Options.py
-index cfe3247..89ccfdd 100644
---- a/Options.py
-+++ b/Options.py
-@@ -177,7 +177,7 @@ class ModData(FreeText):
-     """If you are using modded songs, delete the option below entirely and paste the string from the DivaJSON Tool here"""
-     display_name = "MegaMixModData"
-     default = ''
--    visibility = 0b1001
-+    visibility = Visibility.template | Visibility.spoiler
- 
- 
- @dataclass
-diff --git a/__init__.py b/__init__.py
-index b5bb357..640247a 100644
---- a/__init__.py
-+++ b/__init__.py
-@@ -92,7 +92,7 @@ class MegaMixWorld(World):
-                 raise ValueError(f"Not enough songs available. Need at least {self.options.starting_song_count + self.options.additional_song_count + 1}")
- 
-             # Handle goal ID
--            self.victory_song_id = available_song_keys[chosen_song_index].songID
-+            self.victory_song_id = available_song_keys[chosen_song_index].songID * 10
-             del available_song_keys[chosen_song_index]
- 
-             available_song_keys = self.handle_plando(available_song_keys)
+
