@@ -33,7 +33,7 @@ jobs:
             xargs wget -nv -P /tmp -O /tmp/megamix.apworld
           7z x /tmp/megamix.apworld -o/tmp/
           rm /tmp/megamix.apworld
-          ln -s $TMP_WORLD $ARCHIPELAGO/lib/worlds/
+          ln -s $TMP_WORLD $ARCHIPELAGO/worlds/
 
       - name: World | Apply early diffs
         run: |
