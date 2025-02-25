@@ -67,16 +67,16 @@ jobs:
       #    cp -f "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
       #    parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
 
-      - name: World | General tests
-        run: |
-          cd $ARCHIPELAGO
-          pytest test/general worlds/megamix
-
       - name: World | Fuzzer
         run: |
           cd $ARCHIPELAGO
           curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py"
           python fuzz.py -g megamix -j 2 -r 100
+
+      - name: World | General tests
+        run: |
+          cd $ARCHIPELAGO
+          pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
