@@ -70,7 +70,7 @@ jobs:
       - name: World | Fuzzer
         run: |
           cd $ARCHIPELAGO
-          curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py"
+          curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py" > fuzz.py
           python fuzz.py -g megamix -j 2 -r 100
 
       - name: World | General tests
