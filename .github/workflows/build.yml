@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 env:
-  ROUNDS: 1
+  ROUNDS: 2
   ARCHIPELAGO: /tmp/Archipelago/
   TMP_WORLD: /tmp/megamix/
-  LIB_WORLD: "$ARCHIPELAGO/lib/worlds/megamix/"
+  LIB_WORLD: "$ARCHIPELAGO/worlds/megamix/"
   PLAYER_YAML: "$ARCHIPELAGO/Players/Miku.yaml"
   RELEASE_ARCHIPELAGO: https://api.github.com/repos/ArchipelagoMW/Archipelago/releases
   RELEASE_DIVAAPWORLD: https://api.github.com/repos/Cynichill/DivaAPworld/releases
@@ -23,12 +23,8 @@ jobs:
 
       - name: Archipelago | Setup
         run: |
-          wget -qnv -O - $RELEASE_ARCHIPELAGO |
-            jq '[.[].assets[] | select(.browser_download_url | endswith(".tar.gz"))][0].browser_download_url' |
-            xargs wget -nv -P /tmp
-          mkdir $ARCHIPELAGO
-          tar xzf /tmp/Archipelago*.tar.gz -C /tmp/
-          chmod +x $ARCHIPELAGO/ArchipelagoGenerate
+          cd /tmp
+          git clone https://github.com/ArchipelagoMW/Archipelago    
 
       - name: World | Setup
         run: |
@@ -47,10 +43,11 @@ jobs:
           
       - name: World | Sanity check (early diff)
         run: |
-          $ARCHIPELAGO/ArchipelagoLauncher "Open host.yaml" 2>/dev/null
-          $ARCHIPELAGO/ArchipelagoLauncher "Generate Template Options" 2>/dev/null
-          cp "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "$ARCHIPELAGO/Players/Miku.yaml"
-          parallel -N0 --halt now,fail=1 $ARCHIPELAGO/ArchipelagoGenerate --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
+          cd $ARCHIPELAGO
+          Launcher.py "Open host.yaml" 2>/dev/null
+          Launcher.py "Generate Template Options" 2>/dev/null
+          cp "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
+          parallel -N0 --halt now,fail=1 Generate.py --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
 
       - name: World | Apply late diffs
         run: |
@@ -60,27 +57,32 @@ jobs:
 
       - name: World | Sanity check (late diff)
         run: |
-          $ARCHIPELAGO/ArchipelagoLauncher "Generate Template Options" 2>/dev/null
-          cp -f "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "$ARCHIPELAGO/Players/Miku.yaml"
-          parallel -N0 --halt now,fail=1 $ARCHIPELAGO/ArchipelagoGenerate --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
+          cd $ARCHIPELAGO
+          Launcher.py "Generate Template Options" 2>/dev/null
+          cp -f "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
+          parallel -N0 --halt now,fail=1 Generate.py --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
+
+      - name: World | General tests
+        run: |
+          cd $ARCHIPELAGO
+          pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
           cd /tmp
           rm -rf /tmp/megamix/__pycache__/ /tmp/megamix/.idea/ /tmp/megamix/sorted_mod_pv_db.txt
           7z a -tzip megamix.apworld megamix/
-          cd -
 
-      #- name: World | Artifact
-      #  uses: actions/upload-artifact@v4
-      #  with:
-      #    name: artifact-apworld
-      #    path: /tmp/megamix.apworld
+      - name: World | Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-apworld
+          path: /tmp/megamix.apworld
 
       - name: World | Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
         run: |
           BASE=$(wget -q -O - $RELEASE_DIVAAPWORLD | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
           DATE=$(date +"%y%m%d") # T%H%M%S
@@ -92,7 +94,3 @@ jobs:
               --generate-notes \
               /tmp/megamix.apworld \
               "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
-          
-        #cd $TMP_WORLD
-        #git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/early/0_mod_folder.diff
-        #cd -
