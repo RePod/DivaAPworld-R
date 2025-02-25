@@ -80,6 +80,7 @@ jobs:
       - name: World | Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: github.event_name != 'pull_request'
         run: |
           BASE=$(wget -q -O - $RELEASE_DIVAAPWORLD | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
           DATE=$(date +"%y%m%d") # T%H%M%S
