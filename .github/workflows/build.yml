@@ -44,10 +44,10 @@ jobs:
       - name: World | Sanity check (early diff)
         run: |
           cd $ARCHIPELAGO
-          Launcher.py "Open host.yaml" 2>/dev/null
-          Launcher.py "Generate Template Options" 2>/dev/null
+          python Launcher.py "Open host.yaml" 2>/dev/null
+          python Launcher.py "Generate Template Options" 2>/dev/null
           cp "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
-          parallel -N0 --halt now,fail=1 Generate.py --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
+          parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
 
       - name: World | Apply late diffs
         run: |
@@ -58,14 +58,14 @@ jobs:
       - name: World | Sanity check (late diff)
         run: |
           cd $ARCHIPELAGO
-          Launcher.py "Generate Template Options" 2>/dev/null
+          python Launcher.py "Generate Template Options" 2>/dev/null
           cp -f "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
-          parallel -N0 --halt now,fail=1 Generate.py --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
+          parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
 
       - name: World | General tests
         run: |
           cd $ARCHIPELAGO
-          pytest test/general worlds/megamix
+          python -m pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
