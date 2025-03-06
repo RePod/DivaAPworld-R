@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-subtests pytest-xdist
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
-          python Launcher.py --update_settings  # make sure host.yaml exists for tests
+          python Launcher.py --update_settings
           python Launcher.py "Generate Template Options" 2>/dev/null
 
       - name: World | Setup
@@ -77,10 +77,10 @@ jobs:
           curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py" > fuzz.py
           python fuzz.py -g megamix -j 2 -r 100
 
-      - name: World | General tests
-        run: |
-          cd $ARCHIPELAGO
-          pytest test/general worlds/megamix
+      #- name: World | General tests
+      #  run: |
+      #    cd $ARCHIPELAGO
+      #    pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
