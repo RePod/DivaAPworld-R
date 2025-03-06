@@ -33,7 +33,6 @@ jobs:
           pip install pytest pytest-subtests pytest-xdist
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
           python Launcher.py --update_settings
-          python Launcher.py "Generate Template Options" 2>/dev/null
 
       - name: World | Setup
         run: |
@@ -43,6 +42,8 @@ jobs:
           7z x /tmp/megamix.apworld -o/tmp/
           rm /tmp/megamix.apworld
           ln -s $TMP_WORLD $ARCHIPELAGO/worlds/
+          cd $ARCHIPELAGO
+          python Launcher.py "Generate Template Options" 2>/dev/null
 
       - name: World | Apply early diffs
         run: |
