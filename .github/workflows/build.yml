@@ -61,9 +61,11 @@ jobs:
         run: |
           cd $TMP_WORLD
           git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/late/*.diff || exit 0
+
+      - name: World | Generate Template
           cd $ARCHIPELAGO
           python Launcher.py "Generate Template Options"
-          ls -la $ARCHIPELAGO/Players/Templates/
+          ls -la Players/Templates
 
       #- name: World | Sanity check (late diff)
       #  run: |
