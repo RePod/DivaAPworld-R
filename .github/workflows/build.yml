@@ -33,6 +33,7 @@ jobs:
           pip install pytest pytest-subtests pytest-xdist
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
           python Launcher.py --update_settings  # make sure host.yaml exists for tests
+          python Launcher.py "Generate Template Options" 2>/dev/null
 
       - name: World | Setup
         run: |
