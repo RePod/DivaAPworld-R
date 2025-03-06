@@ -43,7 +43,7 @@ jobs:
           rm /tmp/megamix.apworld
           ln -s $TMP_WORLD $ARCHIPELAGO/worlds/
           cd $ARCHIPELAGO
-          python Launcher.py "Generate Template Options" 2>/dev/null
+          python Launcher.py "Generate Template Options"
           ls -la ./Players/Templates/
 
       - name: World | Apply early diffs
