@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 env:
-  ROUNDS: 1
+  ROUNDS: 2
   ARCHIPELAGO: /tmp/Archipelago/
   TMP_WORLD: /tmp/megamix/
-  LIB_WORLD: "$ARCHIPELAGO/lib/worlds/megamix/"
+  LIB_WORLD: "$ARCHIPELAGO/worlds/megamix/"
   PLAYER_YAML: "$ARCHIPELAGO/Players/Miku.yaml"
   RELEASE_ARCHIPELAGO: https://api.github.com/repos/ArchipelagoMW/Archipelago/releases
   RELEASE_DIVAAPWORLD: https://api.github.com/repos/Cynichill/DivaAPworld/releases
@@ -20,15 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
 
       - name: Archipelago | Setup
         run: |
-          wget -qnv -O - $RELEASE_ARCHIPELAGO |
-            jq '[.[].assets[] | select(.browser_download_url | endswith(".tar.gz"))][0].browser_download_url' |
-            xargs wget -nv -P /tmp
-          mkdir $ARCHIPELAGO
-          tar xzf /tmp/Archipelago*.tar.gz -C /tmp/
-          chmod +x $ARCHIPELAGO/ArchipelagoGenerate
+          cd /tmp
+          git clone https://github.com/ArchipelagoMW/Archipelago
+          cd $ARCHIPELAGO
+          python -m pip install --upgrade pip
+          pip install pytest pytest-subtests pytest-xdist
+          python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
+          python Launcher.py --update_settings  # make sure host.yaml exists for tests
 
       - name: World | Setup
         run: |
@@ -37,7 +41,7 @@ jobs:
             xargs wget -nv -P /tmp -O /tmp/megamix.apworld
           7z x /tmp/megamix.apworld -o/tmp/
           rm /tmp/megamix.apworld
-          ln -s $TMP_WORLD $ARCHIPELAGO/lib/worlds/
+          ln -s $TMP_WORLD $ARCHIPELAGO/worlds/
 
       - name: World | Apply early diffs
         run: |
@@ -45,12 +49,13 @@ jobs:
           git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/early/*.diff
           cd -
           
-      - name: World | Sanity check (early diff)
-        run: |
-          $ARCHIPELAGO/ArchipelagoLauncher "Open host.yaml" 2>/dev/null
-          $ARCHIPELAGO/ArchipelagoLauncher "Generate Template Options" 2>/dev/null
-          cp "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "$ARCHIPELAGO/Players/Miku.yaml"
-          parallel -N0 --halt now,fail=1 $ARCHIPELAGO/ArchipelagoGenerate --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
+      #- name: World | Sanity check (early diff)
+      #  run: |
+      #    cd $ARCHIPELAGO
+      #    python Launcher.py "Open host.yaml" 2>/dev/null
+      #    python Launcher.py "Generate Template Options" 2>/dev/null
+      #    cp "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
+      #    parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
 
       - name: World | Apply late diffs
         run: |
@@ -58,29 +63,40 @@ jobs:
           git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/late/*.diff || exit 0
           cd -
 
-      - name: World | Sanity check (late diff)
+      #- name: World | Sanity check (late diff)
+      #  run: |
+      #    cd $ARCHIPELAGO
+      #    python Launcher.py "Generate Template Options" 2>/dev/null
+      #    cp -f "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
+      #    parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
+
+      - name: World | Fuzzer
         run: |
-          $ARCHIPELAGO/ArchipelagoLauncher "Generate Template Options" 2>/dev/null
-          cp -f "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "$ARCHIPELAGO/Players/Miku.yaml"
-          parallel -N0 --halt now,fail=1 $ARCHIPELAGO/ArchipelagoGenerate --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
+          cd $ARCHIPELAGO
+          curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py" > fuzz.py
+          python fuzz.py -g megamix -j 2 -r 100
+
+      - name: World | General tests
+        run: |
+          cd $ARCHIPELAGO
+          pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
           cd /tmp
           rm -rf /tmp/megamix/__pycache__/ /tmp/megamix/.idea/ /tmp/megamix/sorted_mod_pv_db.txt
           7z a -tzip megamix.apworld megamix/
-          cd -
 
-      #- name: World | Artifact
-      #  uses: actions/upload-artifact@v4
-      #  with:
-      #    name: artifact-apworld
-      #    path: /tmp/megamix.apworld
+      - name: World | Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-apworld
+          path: /tmp/megamix.apworld
 
       - name: World | Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
         run: |
           BASE=$(wget -q -O - $RELEASE_DIVAAPWORLD | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
           DATE=$(date +"%y%m%d") # T%H%M%S
@@ -92,7 +108,3 @@ jobs:
               --generate-notes \
               /tmp/megamix.apworld \
               "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
-          
-        #cd $TMP_WORLD
-        #git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/early/0_mod_folder.diff
-        #cd -
