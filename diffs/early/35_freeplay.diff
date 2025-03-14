@@ -140,11 +140,11 @@ index f5436f3..db3439c 100644
 -            file_data = re.sub(search, r"\g<1>", file.read())
 +            file_data = file.read()
 +            if freeplay:
-+                file_data = modify_mod_pv(file_data, f"(?!({processed_ids})\.)\d+")
++                file_data = modify_mod_pv(file_data, rf"(?!({processed_ids})\.)\d+")
 +                file_data = remove_song(file_data, processed_ids)
 +            else:
 +                file_data = modify_mod_pv(file_data, processed_ids)
-+                file_data = remove_song(file_data, f"(?!({processed_ids})\.)\d+")
++                file_data = remove_song(file_data, rf"(?!({processed_ids})\.)\d+")
              file.seek(0)
              file.write(file_data)
              file.truncate()
