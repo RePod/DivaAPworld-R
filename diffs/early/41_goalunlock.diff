@@ -1,5 +1,5 @@
 diff --git a/Client.py b/Client.py
-index 8b9fdb4..f1a0a47 100644
+index e2bfd6c..9b133ed 100644
 --- a/Client.py
 +++ b/Client.py
 @@ -207,9 +207,11 @@ class MegaMixContext(CommonContext):
@@ -9,7 +9,7 @@ index 8b9fdb4..f1a0a47 100644
 -        if not self.sent_unlock_message and self.leeks_obtained >= self.leeks_needed:
 -            self.sent_unlock_message = True
 -            logger.info(f"Got enough leeks! Unlocking goal song: {self.goal_song}")
-+        if  self.leeks_obtained >= self.leeks_needed:
++        if self.leeks_obtained >= self.leeks_needed:
 +            if not self.sent_unlock_message:
 +                self.sent_unlock_message = True
 +                logger.info(f"Got enough leeks! Unlocking goal song: {self.goal_song}")
