@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  ROUNDS: 2
+  UPSTREAM_REF: bae92f91478790e8cac1a787e88a2ff4f4417dcf
 
 jobs:
   build:
@@ -23,7 +23,7 @@ jobs:
         with:
           repository: Cynichill/DivaAPworld
           path: worlds/megamix
-          #ref:
+          ref: ${{ env.UPSTREAM_REF }}
       
       - uses: actions/setup-python@v5
         with:
