@@ -21,10 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          path: /tmp/patches
+          repository: ArchipelagoMW/Archipelago
       - uses: actions/checkout@v4
         with:
-          repository: ArchipelagoMW/Archipelago
+          path: patches
       - uses: actions/checkout@v4
         with:
           repository: Cynichill/DivaAPworld
@@ -47,12 +47,12 @@ jobs:
       - name: World | Apply early diffs
         run: |
           cd ./worlds/megamix
-          git apply --ignore-space-change --ignore-whitespace -v /tmp/patches/diffs/early/*.diff
+          git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/early/*.diff
 
       - name: World | Apply late diffs
         run: |
           cd ./worlds/megamix
-          git apply --ignore-space-change --ignore-whitespace -v /tmp/patches/diffs/late/*.diff || exit 0
+          git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/late/*.diff || exit 0
 
       - name: World | Generate Template
         run: |
