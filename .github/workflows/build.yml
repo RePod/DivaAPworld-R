@@ -40,13 +40,15 @@ jobs:
 
       - name: World | Apply early diffs
         run: |
+          [ ! -d ./patches/diffs/early ] || [ -z "$( ls -A ./patches/diffs/early/*.diff )" ] && exit 0
           cd ./worlds/megamix
           git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/early/*.diff
 
       - name: World | Apply late diffs
         run: |
+          [ ! -d ./patches/diffs/late ] || [ -z "$( ls -A ./patches/diffs/late/*.diff )" ] && exit 0
           cd ./worlds/megamix
-          git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/late/*.diff || exit 0
+          git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/late/*.diff
 
       - name: World | Generate Template
         run: |
@@ -71,7 +73,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifact-apworld
-          path: /tmp/megamix.apworld
+          path: |
+            /tmp/megamix.apworld
+            "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
 
       - name: World | Release
         env:
@@ -88,4 +92,4 @@ jobs:
               --generate-notes \
               --notes ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE" \
               /tmp/megamix.apworld \
-              "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
+              "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
