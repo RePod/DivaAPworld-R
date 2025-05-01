@@ -23,7 +23,7 @@ jobs:
         with:
           repository: Cynichill/DivaAPworld
           path: worlds/megamix
-          ref: $UPSTREAM_REF
+          ref: ${{ env.UPSTREAM_REF }}
       
       - uses: actions/setup-python@v5
         with:
