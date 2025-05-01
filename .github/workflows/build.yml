@@ -65,7 +65,7 @@ jobs:
       - name: World | Zip
         run: |
           rm -rf worlds/megamix/.git* worlds/megamix/__pycache__/ worlds/megamix/.idea/ worlds/megamix/sorted_mod_pv_db.txt
-          7z a -tzip /tmp/megamix.apworld worlds/megamix/
+          7z a -tzip /tmp/megamix.apworld ./worlds/megamix/
 
       - name: World | Artifact
         uses: actions/upload-artifact@v4
