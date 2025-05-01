@@ -67,14 +67,14 @@ jobs:
       - name: World | Zip
         run: |
           rm -rf worlds/megamix/.git* worlds/megamix/*.yaml worlds/megamix/__pycache__/ worlds/megamix/.idea/ worlds/megamix/sorted_mod_pv_db.txt
-          7z a -tzip /tmp/megamix.apworld ./worlds/megamix/
+          7z a -tzip megamix.apworld ./worlds/megamix/
 
       - name: World | Artifact
         uses: actions/upload-artifact@v4
         with:
           name: artifact-apworld
           path: |
-            /tmp/megamix.apworld
+            megamix.apworld
             ./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml
 
       - name: World | Release
@@ -91,5 +91,5 @@ jobs:
               --target=main \
               --generate-notes \
               --notes ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE" \
-              /tmp/megamix.apworld \
+              megamix.apworld \
               "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
