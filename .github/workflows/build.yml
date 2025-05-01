@@ -33,7 +33,7 @@ jobs:
           pip install pytest pytest-subtests pytest-xdist
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
           python Launcher.py --update_settings
-          rm -rf ./worlds/*/
+          find ./worlds -mindepth 1 -maxdepth 1 -type d ! -name 'generic' -exec rm -rf {} \;
 
       - name: World | Setup
         run: |
