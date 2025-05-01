@@ -27,7 +27,7 @@ jobs:
           repository: ArchipelagoMW/Archipelago
       - uses: actions/checkout@v4
         with:
-          repository: 
+          repository: Cynichill/DivaAPworld
           path: worlds/megamix
           #ref:
       
@@ -43,16 +43,6 @@ jobs:
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
           python Launcher.py --update_settings
           find ./worlds -mindepth 1 -maxdepth 1 -type d -regextype posix-extended ! -regex '.*/(megamix|generic|alttp)' -exec rm -rf {} \;
-          ln -s ./worlds/megamix $TMP_WORLD
-
-      - name: World | Setup
-        run: |
-          wget -q -O - $RELEASE_DIVAAPWORLD |
-            jq '[.[].assets[] | select(.browser_download_url | endswith(".apworld"))][0].browser_download_url' |
-            xargs wget -nv -P /tmp -O /tmp/megamix.apworld
-          7z x /tmp/megamix.apworld -o/tmp/
-          rm /tmp/megamix.apworld
-          ln -s $TMP_WORLD $ARCHIPELAGO/worlds/
 
       - name: World | Apply early diffs
         run: |
