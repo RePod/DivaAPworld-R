@@ -8,95 +8,75 @@ on:
 
 env:
   ROUNDS: 2
-  ARCHIPELAGO: /tmp/Archipelago/
-  TMP_WORLD: /tmp/megamix/
-  LIB_WORLD: "$ARCHIPELAGO/worlds/megamix/"
-  PLAYER_YAML: "$ARCHIPELAGO/Players/Miku.yaml"
-  RELEASE_ARCHIPELAGO: https://api.github.com/repos/ArchipelagoMW/Archipelago/releases
-  RELEASE_DIVAAPWORLD: https://api.github.com/repos/Cynichill/DivaAPworld/releases
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ArchipelagoMW/Archipelago
+      - uses: actions/checkout@v4
+        with:
+          path: patches
+      - uses: actions/checkout@v4
+        with:
+          repository: Cynichill/DivaAPworld
+          path: worlds/megamix
+          #ref:
+      
       - uses: actions/setup-python@v5
         with:
+          python-version: 3.12
           cache: 'pip'
 
       - name: Archipelago | Setup
         run: |
-          cd /tmp
-          git clone https://github.com/ArchipelagoMW/Archipelago
-          cd $ARCHIPELAGO
           python -m pip install --upgrade pip
           pip install pytest pytest-subtests pytest-xdist
           python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
           python Launcher.py --update_settings
-
-      - name: World | Setup
-        run: |
-          wget -q -O - $RELEASE_DIVAAPWORLD |
-            jq '[.[].assets[] | select(.browser_download_url | endswith(".apworld"))][0].browser_download_url' |
-            xargs wget -nv -P /tmp -O /tmp/megamix.apworld
-          7z x /tmp/megamix.apworld -o/tmp/
-          rm /tmp/megamix.apworld
-          ln -s $TMP_WORLD $ARCHIPELAGO/worlds/
+          find ./worlds -mindepth 1 -maxdepth 1 -type d -regextype posix-extended ! -regex '.*/(megamix|generic|alttp)' -exec rm -rf {} \;
 
       - name: World | Apply early diffs
         run: |
-          cd $TMP_WORLD
-          git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/early/*.diff
-          cd -
-          
-      #- name: World | Sanity check (early diff)
-      #  run: |
-      #    cd $ARCHIPELAGO
-      #    python Launcher.py "Open host.yaml" 2>/dev/null
-      #    python Launcher.py "Generate Template Options" 2>/dev/null
-      #    cp "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
-      #    parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1.. $ROUNDS}
+          [ ! -d ./patches/diffs/early ] || [ -z "$( ls -A ./patches/diffs/early/*.diff )" ] && exit 0
+          cd ./worlds/megamix
+          git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/early/*.diff
 
       - name: World | Apply late diffs
         run: |
-          cd $TMP_WORLD
-          git apply --ignore-space-change --ignore-whitespace -v $GITHUB_WORKSPACE/diffs/late/*.diff || exit 0
+          [ ! -d ./patches/diffs/late ] || [ -z "$( ls -A ./patches/diffs/late/*.diff )" ] && exit 0
+          cd ./worlds/megamix
+          git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/late/*.diff
 
       - name: World | Generate Template
         run: |
-          cd $ARCHIPELAGO
           python Launcher.py "Generate Template Options"
           ls -la Players/Templates
-
-      #- name: World | Sanity check (late diff)
-      #  run: |
-      #    cd $ARCHIPELAGO
-      #    python Launcher.py "Generate Template Options" 2>/dev/null
-      #    cp -f "Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" "Players/Miku.yaml"
-      #    parallel -N0 --halt now,fail=1 python Generate.py --skip_prog_balancing --skip_output ::: {1..$ROUNDS}
+          cp "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" .
 
       - name: World | Fuzzer
         run: |
-          cd $ARCHIPELAGO
           curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py" > fuzz.py
           python fuzz.py -g megamix -j 2 -r 100
 
       - name: World | General tests
         run: |
-          cd $ARCHIPELAGO
           pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
-          cd /tmp
-          rm -rf /tmp/megamix/__pycache__/ /tmp/megamix/.idea/ /tmp/megamix/sorted_mod_pv_db.txt
-          7z a -tzip megamix.apworld megamix/
+          rm -rf worlds/megamix/.git* worlds/megamix/*.yaml worlds/megamix/__pycache__/ worlds/megamix/.idea/ worlds/megamix/sorted_mod_pv_db.txt
+          7z a -tzip megamix.apworld ./worlds/megamix/
 
       - name: World | Artifact
         uses: actions/upload-artifact@v4
         with:
           name: artifact-apworld
-          path: /tmp/megamix.apworld
+          path: |
+            megamix.apworld
+            Hatsune Miku Project Diva Mega Mix+.yaml
 
       - name: World | Release
         env:
@@ -112,5 +92,5 @@ jobs:
               --target=main \
               --generate-notes \
               --notes ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE" \
-              /tmp/megamix.apworld \
-              "$ARCHIPELAGO/Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
+              megamix.apworld \
+              "Hatsune Miku Project Diva Mega Mix+.yaml"
