@@ -54,6 +54,7 @@ jobs:
         run: |
           python Launcher.py "Generate Template Options"
           ls -la Players/Templates
+          cp ./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml .
 
       - name: World | Fuzzer
         run: |
@@ -75,7 +76,7 @@ jobs:
           name: artifact-apworld
           path: |
             megamix.apworld
-            ./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml
+            Hatsune Miku Project Diva Mega Mix+.yaml
 
       - name: World | Release
         env:
@@ -92,4 +93,4 @@ jobs:
               --generate-notes \
               --notes ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE" \
               megamix.apworld \
-              "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml"
+              "Hatsune Miku Project Diva Mega Mix+.yaml"
