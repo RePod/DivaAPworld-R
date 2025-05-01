@@ -54,7 +54,7 @@ jobs:
         run: |
           python Launcher.py "Generate Template Options"
           ls -la Players/Templates
-          cp ./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml .
+          cp "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" .
 
       - name: World | Fuzzer
         run: |
