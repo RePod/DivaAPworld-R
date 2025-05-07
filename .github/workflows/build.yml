@@ -40,6 +40,7 @@ jobs:
 
       - name: World | Apply early diffs
         run: |
+          echo "Applying diffs on upstream hash ${{ env.UPSTREAM_REF }}"
           [ ! -d ./patches/diffs/early ] || [ -z "$( ls -A ./patches/diffs/early/*.diff )" ] && exit 0
           cd ./worlds/megamix
           git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/early/*.diff
@@ -91,6 +92,6 @@ jobs:
               --title="$TITLE" \
               --target=main \
               --generate-notes \
-              --notes ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE" \
+              --notes ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\nDiffs applied on upstream hash ${{ env.UPSTREAM_REF }}" \
               megamix.apworld \
               "Hatsune Miku Project Diva Mega Mix+.yaml"
