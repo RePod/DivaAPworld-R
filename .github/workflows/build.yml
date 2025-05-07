@@ -87,7 +87,7 @@ jobs:
           BASE=$(wget -q -O - https://api.github.com/repos/Cynichill/DivaAPworld/releases | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
           DATE=$(date +"%y%m%d") # T%H%M%S
           TAG=$(git rev-parse --short HEAD)
-          echo ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF }}](https://github.com/Cynichill/DivaAPworld/commit/${{ env.UPSTREAM_REF }})" > newlines_hard.txt
+          echo -e ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\n\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF }}](https://github.com/Cynichill/DivaAPworld/commit/${{ env.UPSTREAM_REF }})" > newlines_hard.txt
           gh release create "${BASE}-R_${DATE}-${TAG}" \
               --repo="$GITHUB_REPOSITORY" \
               --title="$TITLE" \
