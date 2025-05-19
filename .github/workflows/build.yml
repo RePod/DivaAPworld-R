@@ -86,9 +86,9 @@ jobs:
         run: |
           BASE=$(wget -q -O - https://api.github.com/repos/Cynichill/DivaAPworld/releases | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
           DATE=$(date +"%y%m%d") # T%H%M%S
-          SHAONE=$(sha1sum megamix.apworld)
-          TAG=$(cd patches && git rev-parse --short HEAD && cd -)
-          echo -e ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\n\nSHA1 \`${SHAONE}\`\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF }}](https://github.com/Cynichill/DivaAPworld/commit/${{ env.UPSTREAM_REF }})" > newlines_hard.txt
+          SHAONE=$(sha1sum megamix.apworld); SHAONE="\`${SHAONE}\`"
+          TAG=$(cd patches && git rev-parse --short HEAD)
+          echo -e ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\n\nSHA1 ${SHAONE}\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF }}](https://github.com/Cynichill/DivaAPworld/commit/${{ env.UPSTREAM_REF }})" > newlines_hard.txt
           RELEASE_TAG="${BASE}-R_${DATE}-${TAG}"
           gh release create "$RELEASE_TAG" \
               --repo="$GITHUB_REPOSITORY" \
