@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM_REF: bae92f91478790e8cac1a787e88a2ff4f4417dcf
+  UPSTREAM_REF: 8a2f97003007d437946f46918fe7437e775ec529
 
 jobs:
   build:
