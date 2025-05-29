@@ -1,6 +1,6 @@
 [![CI](https://github.com/RePod/DivaAPworld-R/actions/workflows/build.yml/badge.svg)](https://github.com/RePod/DivaAPworld-R/actions/workflows/build.yml)
 
-An ***unofficial*** bleeding edge version of [the Upstream Testing Branch](https://github.com/Cynichill/DivaAPworld/tree/bae92f91478790e8cac1a787e88a2ff4f4417dcf) (*UTB*) with [select PRs](diffs/) combined into one. 
+An ***unofficial*** bleeding edge version of [the Upstream Testing Branch](https://github.com/Cynichill/DivaAPworld/tree/testing) (*UTB*) with [select PRs](diffs/) combined into one. See [`UPSTREAM_REF`](.github/workflows/build.yml) for specific UTB commit.
 
 If/when [previously selected PRs are merged into UTB](https://github.com/Cynichill/DivaAPworld/pulls?q=is%3Apr+base%3Atesting) the corresponding `##_featurename.diff` will be removed as obsolete since the changes would come from UTB.
 
