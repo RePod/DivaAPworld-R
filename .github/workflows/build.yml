@@ -25,18 +25,22 @@ jobs:
           path: worlds/megamix
           ref: ${{ env.UPSTREAM_REF }}
       
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
+          version: "latest"
           python-version: 3.12
-          cache: 'pip'
+          enable-cache: true
 
       - name: Archipelago | Setup
         run: |
           find ./worlds -mindepth 1 -maxdepth 1 -type d -regextype posix-extended ! -regex '.*/(megamix|generic|alttp)' -exec rm -rf {} \;
-          python -m pip install --upgrade pip
-          pip install pytest pytest-subtests pytest-xdist
-          python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
-          python Launcher.py --update_settings         
+          uv venv
+          uv pip install pip pytest pytest-subtests pytest-xdist
+          find -name requirements.txt | xargs -n1 uv pip install -r
+          uv run cythonize -a -i _speedups.pyx
+          uv run python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
+          uv run python Launcher.py --update_settings         
 
       - name: World | Apply early diffs
         run: |
@@ -53,18 +57,18 @@ jobs:
 
       - name: World | Generate Template
         run: |
-          python Launcher.py "Generate Template Options"
+          uv run python Launcher.py "Generate Template Options"
           ls -la Players/Templates
           cp "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" .
 
       - name: World | Fuzzer
         run: |
           curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py" > fuzz.py
-          python fuzz.py -g megamix -j 2 -r 100
+          uv run python fuzz.py -g megamix -j 2 -r 100
 
       - name: World | General tests
         run: |
-          pytest test/general worlds/megamix
+          uv run pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
