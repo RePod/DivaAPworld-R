@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM_REF: 8a2f97003007d437946f46918fe7437e775ec529
+  UPSTREAM_REF_APWORLD: 8a2f97003007d437946f46918fe7437e775ec529
+  UPSTREAM_REF_FUZZER: 08a26bc8170fa2b49f805511f499a22e626daa40
 
 jobs:
   build:
@@ -23,20 +24,24 @@ jobs:
         with:
           repository: Cynichill/DivaAPworld
           path: worlds/megamix
-          ref: ${{ env.UPSTREAM_REF }}
+          ref: ${{ env.UPSTREAM_REF_APWORLD }}
       
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
+          version: "latest"
           python-version: 3.12
-          cache: 'pip'
+          enable-cache: true
 
       - name: Archipelago | Setup
         run: |
           find ./worlds -mindepth 1 -maxdepth 1 -type d -regextype posix-extended ! -regex '.*/(megamix|generic|alttp)' -exec rm -rf {} \;
-          python -m pip install --upgrade pip
-          pip install pytest pytest-subtests pytest-xdist
-          python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
-          python Launcher.py --update_settings         
+          uv venv
+          uv pip install pip pytest pytest-subtests pytest-xdist
+          find -name requirements.txt | xargs -n1 uv pip install -r
+          #uv run cythonize -a -i _speedups.pyx # 3.11-
+          uv run python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
+          uv run python Launcher.py --update_settings         
 
       - name: World | Apply early diffs
         run: |
@@ -53,18 +58,17 @@ jobs:
 
       - name: World | Generate Template
         run: |
-          python Launcher.py "Generate Template Options"
-          ls -la Players/Templates
+          uv run python Launcher.py "Generate Template Options"
           cp "./Players/Templates/Hatsune Miku Project Diva Mega Mix+.yaml" .
 
       - name: World | Fuzzer
         run: |
-          curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/refs/heads/main/fuzz.py" > fuzz.py
-          python fuzz.py -g megamix -j 2 -r 100
+          curl "https://raw.githubusercontent.com/Eijebong/Archipelago-fuzzer/${{ env.UPSTREAM_REF_FUZZER }}/fuzz.py" > fuzz.py
+          uv run python fuzz.py -g megamix -j 2 -r 100
 
       - name: World | General tests
         run: |
-          pytest test/general worlds/megamix
+          uv run pytest test/general worlds/megamix
 
       - name: World | Zip
         run: |
@@ -84,11 +88,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: github.event_name == 'workflow_dispatch'
         run: |
-          BASE=$(wget -q -O - https://api.github.com/repos/Cynichill/DivaAPworld/releases | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
+          BASE=$(curl https://api.github.com/repos/Cynichill/DivaAPworld/releases | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
           DATE=$(date +"%y%m%d") # T%H%M%S
           SHAONE=$(sha1sum megamix.apworld); SHAONE="\`${SHAONE}\`"
           TAG=$(cd patches && git rev-parse --short HEAD)
-          echo -e ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\n\nSHA1 ${SHAONE}\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF }}](https://github.com/Cynichill/DivaAPworld/commit/${{ env.UPSTREAM_REF }})" > newlines_hard.txt
+          echo -e ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\n\nSHA1 ${SHAONE}\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF_APWORLD }}](https://github.com/Cynichill/DivaAPworld/commit/${{ env.UPSTREAM_REF_APWORLD }})" > newlines_hard.txt
           RELEASE_TAG="${BASE}-R_${DATE}-${TAG}"
           gh release create "$RELEASE_TAG" \
               --repo="$GITHUB_REPOSITORY" \
