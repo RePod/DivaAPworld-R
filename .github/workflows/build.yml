@@ -38,7 +38,7 @@ jobs:
           uv venv
           uv pip install pip pytest pytest-subtests pytest-xdist
           find -name requirements.txt | xargs -n1 uv pip install -r
-          uv run cythonize -a -i _speedups.pyx
+          #uv run cythonize -a -i _speedups.pyx # 3.11-
           uv run python ModuleUpdate.py --yes --force --append "WebHostLib/requirements.txt"
           uv run python Launcher.py --update_settings         
 
