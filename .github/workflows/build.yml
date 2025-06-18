@@ -72,7 +72,8 @@ jobs:
 
       - name: World | Zip
         run: |
-          rm -rf worlds/megamix/.git* worlds/megamix/*.yaml worlds/megamix/__pycache__ worlds/megamix/.idea worlds/megamix/sorted_mod_pv_db.txt worlds/megamix/docs
+          rm -rf worlds/megamix/.git* worlds/megamix/*.yaml worlds/megamix/.idea worlds/megamix/sorted_mod_pv_db.txt worlds/megamix/docs
+          find . -type d -iname '__pycache__' -exec rm -rf {} \;
           7z a -tzip -mm=deflate64 -mfb=257 -mx9 -mtc- -mta- -mtm- megamix.apworld ./worlds/megamix/
 
       - name: World | Artifact
