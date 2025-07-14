@@ -45,7 +45,7 @@ jobs:
 
       - name: World | Apply early diffs
         run: |
-          echo "Applying diffs on upstream hash ${{ env.UPSTREAM_REF }}"
+          echo "Applying diffs on upstream hash ${{ env.UPSTREAM_REF_APWORLD }}"
           [ ! -d ./patches/diffs/early ] || [ -z "$( ls -A ./patches/diffs/early/*.diff )" ] && exit 0
           cd ./worlds/megamix
           git apply --ignore-space-change --ignore-whitespace -v ../../patches/diffs/early/*.diff
