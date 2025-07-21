@@ -1,5 +1,5 @@
 diff --git a/Client.py b/Client.py
-index 6a272af..3b8f89a 100644
+index 03e6338..9541db8 100644
 --- a/Client.py
 +++ b/Client.py
 @@ -52,6 +52,10 @@ class DivaClientCommandProcessor(ClientCommandProcessor):
@@ -70,7 +70,7 @@ index 6a272af..3b8f89a 100644
      def song_id_to_pack(self, item_id):
          target_song_id = int(item_id) // 10
  
-@@ -211,22 +223,48 @@ class MegaMixContext(CommonContext):
+@@ -211,22 +223,50 @@ class MegaMixContext(CommonContext):
      async def watch_json_file(self, file_name: str):
          """Watch a JSON file for changes and call the callback function."""
          file_path = os.path.join(os.path.dirname(__file__), file_name)
@@ -79,16 +79,23 @@ index 6a272af..3b8f89a 100644
          try:
              while True:
                  await asyncio.sleep(1)  # Wait for a short duration
-                 modified = os.path.getmtime(file_path)
+-                modified = os.path.getmtime(file_path)
 -                if modified != last_modified:
-+                if modified > last_modified:
-                     last_modified = modified
-                     try:
-                         json_data = load_json_file(file_name)
+-                    last_modified = modified
+-                    try:
+-                        json_data = load_json_file(file_name)
 -                        self.receive_location_check(json_data)
-+                        await self.receive_location_check(json_data)
-                     except (FileNotFoundError, json.JSONDecodeError) as e:
-                         print(f"Error loading JSON file: {e}")
+-                    except (FileNotFoundError, json.JSONDecodeError) as e:
+-                        print(f"Error loading JSON file: {e}")
++                if os.path.isfile(file_path):
++                    modified = os.path.getmtime(file_path)
++                    if modified > last_modified:
++                        last_modified = modified
++                        try:
++                            json_data = load_json_file(file_name)
++                            await self.receive_location_check(json_data)
++                        except (FileNotFoundError, json.JSONDecodeError) as e:
++                            print(f"Error loading JSON file: {e}")
          except asyncio.CancelledError:
              print(f"Watch task for {file_name} was canceled.")
  
@@ -120,10 +127,11 @@ index 6a272af..3b8f89a 100644
 +
 +
 +    async def receive_location_check(self, song_data):
- 
++
          logger.debug(song_data)
+ 
          # If song is not dummy song
-@@ -255,6 +293,9 @@ class MegaMixContext(CommonContext):
+@@ -256,6 +296,9 @@ class MegaMixContext(CommonContext):
                  asyncio.create_task(self.send_checks())
              else:
                  logger.info(f"Song {song_data.get('pvName')} was not beaten with a high enough grade")
@@ -133,7 +141,7 @@ index 6a272af..3b8f89a 100644
          else:
              logger.info("No checks to send at BK but seeing this means your Client is OK!")
  
-@@ -364,6 +405,23 @@ class MegaMixContext(CommonContext):
+@@ -365,6 +408,23 @@ class MegaMixContext(CommonContext):
      async def restore_songs(self):
          restore_originals(self.mod_pv_list)
  
