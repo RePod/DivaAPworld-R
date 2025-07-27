@@ -1,5 +1,5 @@
 diff --git a/Client.py b/Client.py
-index 03e6338..9541db8 100644
+index 1c00ecb..572a34d 100644
 --- a/Client.py
 +++ b/Client.py
 @@ -52,6 +52,10 @@ class DivaClientCommandProcessor(ClientCommandProcessor):
@@ -22,9 +22,9 @@ index 03e6338..9541db8 100644
          self.modData = None
          self.modded = False
          self.freeplay = False
-@@ -92,11 +98,16 @@ class MegaMixContext(CommonContext):
-         self.leeks_needed = None
+@@ -93,11 +99,16 @@ class MegaMixContext(CommonContext):
          self.leeks_obtained = 0
+         self.leek_label = None
          self.grade_needed = None
 +        self.death_link = False
 +        self.death_link_amnesty = 0
@@ -39,7 +39,7 @@ index 03e6338..9541db8 100644
          self.obtained_items_queue = asyncio.Queue()
          self.critical_section_lock = asyncio.Lock()
  
-@@ -128,6 +139,15 @@ class MegaMixContext(CommonContext):
+@@ -129,6 +140,15 @@ class MegaMixContext(CommonContext):
              self.mod_pv_list.append(self.mod_pv)
              create_copies(self.mod_pv_list)
              asyncio.create_task(self.send_msgs([{"cmd": "GetDataPackage", "games": ["Hatsune Miku Project Diva Mega Mix+"]}]))
@@ -55,7 +55,7 @@ index 03e6338..9541db8 100644
              self.check_goal()
  
              # if we don't have the seed name from the RoomInfo packet, wait until we do.
-@@ -161,14 +181,6 @@ class MegaMixContext(CommonContext):
+@@ -162,14 +182,6 @@ class MegaMixContext(CommonContext):
              # If receiving data package, resync previous items
              asyncio.create_task(self.receive_item())
  
@@ -70,7 +70,7 @@ index 03e6338..9541db8 100644
      def song_id_to_pack(self, item_id):
          target_song_id = int(item_id) // 10
  
-@@ -211,22 +223,50 @@ class MegaMixContext(CommonContext):
+@@ -218,22 +230,50 @@ class MegaMixContext(CommonContext):
      async def watch_json_file(self, file_name: str):
          """Watch a JSON file for changes and call the callback function."""
          file_path = os.path.join(os.path.dirname(__file__), file_name)
@@ -131,7 +131,7 @@ index 03e6338..9541db8 100644
          logger.debug(song_data)
  
          # If song is not dummy song
-@@ -256,6 +296,9 @@ class MegaMixContext(CommonContext):
+@@ -263,6 +303,9 @@ class MegaMixContext(CommonContext):
                  asyncio.create_task(self.send_checks())
              else:
                  logger.info(f"Song {song_data.get('pvName')} was not beaten with a high enough grade")
@@ -141,7 +141,7 @@ index 03e6338..9541db8 100644
          else:
              logger.info("No checks to send at BK but seeing this means your Client is OK!")
  
-@@ -365,6 +408,23 @@ class MegaMixContext(CommonContext):
+@@ -372,6 +415,23 @@ class MegaMixContext(CommonContext):
      async def restore_songs(self):
          restore_originals(self.mod_pv_list)
  
@@ -166,10 +166,10 @@ index 03e6338..9541db8 100644
  def launch():
      """
 diff --git a/Options.py b/Options.py
-index a85a49c..9f8e1c7 100644
+index 73daf6b..eb49bdd 100644
 --- a/Options.py
 +++ b/Options.py
-@@ -180,6 +180,30 @@ class ModData(FreeText):
+@@ -175,6 +175,30 @@ class ModData(FreeText):
      visibility = Visibility.template | Visibility.spoiler
  
  
@@ -200,17 +200,17 @@ index a85a49c..9f8e1c7 100644
  @dataclass
  class MegaMixOptions(PerGameCommonOptions):
      allow_megamix_dlc_songs: AllowMegaMixDLCSongs
-@@ -198,3 +222,5 @@ class MegaMixOptions(PerGameCommonOptions):
+@@ -193,3 +217,5 @@ class MegaMixOptions(PerGameCommonOptions):
      exclude_songs: ExcludeSongs
-     exclude_singers: ExcludeSinger
+     exclude_singers: Removed
      megamix_mod_data: ModData
 +    death_link: DivaDeathLink
 +    death_link_amnesty: DeathLinkAmnesty
 diff --git a/__init__.py b/__init__.py
-index 34e3552..eef41e8 100644
+index 0ef5da4..03a7fd6 100644
 --- a/__init__.py
 +++ b/__init__.py
-@@ -319,5 +319,7 @@ class MegaMixWorld(World):
+@@ -323,5 +323,7 @@ class MegaMixWorld(World):
              "leekWinCount": self.get_leek_win_count(),
              "scoreGradeNeeded": self.options.grade_needed.value,
              "autoRemove": bool(self.options.auto_remove_songs),
