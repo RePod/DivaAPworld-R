@@ -1,5 +1,5 @@
 diff --git a/Client.py b/Client.py
-index 1c00ecb..572a34d 100644
+index 1c00ecb..4754d4d 100644
 --- a/Client.py
 +++ b/Client.py
 @@ -52,6 +52,10 @@ class DivaClientCommandProcessor(ClientCommandProcessor):
@@ -39,6 +39,15 @@ index 1c00ecb..572a34d 100644
          self.obtained_items_queue = asyncio.Queue()
          self.critical_section_lock = asyncio.Lock()
  
+@@ -121,7 +132,7 @@ class MegaMixContext(CommonContext):
+             self.goal_id = self.options["victoryID"]
+             self.autoRemove = self.options["autoRemove"]
+             self.leeks_needed = self.options["leekWinCount"]
+-            self.grade_needed = int(self.options["scoreGradeNeeded"]) + 2  # Add 2 to match the games internals
++            self.grade_needed = int(self.options["scoreGradeNeeded"])
+             self.modData = self.options["modData"]
+             if self.modData:
+                 self.modded = True
 @@ -129,6 +140,15 @@ class MegaMixContext(CommonContext):
              self.mod_pv_list.append(self.mod_pv)
              create_copies(self.mod_pv_list)
@@ -70,7 +79,7 @@ index 1c00ecb..572a34d 100644
      def song_id_to_pack(self, item_id):
          target_song_id = int(item_id) // 10
  
-@@ -218,22 +230,50 @@ class MegaMixContext(CommonContext):
+@@ -218,53 +230,83 @@ class MegaMixContext(CommonContext):
      async def watch_json_file(self, file_name: str):
          """Watch a JSON file for changes and call the callback function."""
          file_path = os.path.join(os.path.dirname(__file__), file_name)
@@ -127,21 +136,66 @@ index 1c00ecb..572a34d 100644
 +
 +
 +    async def receive_location_check(self, song_data):
-+
          logger.debug(song_data)
  
-         # If song is not dummy song
-@@ -263,6 +303,9 @@ class MegaMixContext(CommonContext):
-                 asyncio.create_task(self.send_checks())
-             else:
-                 logger.info(f"Song {song_data.get('pvName')} was not beaten with a high enough grade")
-+
-+                if self.death_link and not song_data.get('deathLinked', False):
-+                    await self.send_death(f"The Disappearance of {self.player_names[self.slot]}")
-         else:
-             logger.info("No checks to send at BK but seeing this means your Client is OK!")
+-        # If song is not dummy song
+-        if song_data.get('pvId') != 144:
+-            location_id = int(song_data.get('pvId') * 10)
+-            location_checks = set(range(location_id, location_id + self.checks_per_song))
++        if song_data.get('pvId') == 144: # Always available AP mod song
++            logger.info("No checks to send at BK but seeing this means your Client is OK!")
++            return
  
-@@ -372,6 +415,23 @@ class MegaMixContext(CommonContext):
+-            if not location_id == self.goal_id:
+-                if location_checks.issubset(set(self.prev_found)):
+-                    logger.info("No checks to send: Song checks previously sent or collected")
+-                    return
++        location_id = int(song_data.get('pvId') * 10)
++        location_checks = set(range(location_id, location_id + self.checks_per_song))
+ 
+-                if not location_id in self.location_ids:
+-                    logger.info("No checks to send: Song not in song pool")
+-                    return
++        if not location_id == self.goal_id:
++            if location_checks.issubset(set(self.prev_found)):
++                logger.info("No checks to send: Song checks previously sent or collected")
++                return
+ 
+-            if int(song_data.get('scoreGrade')) >= self.grade_needed:
+-                if location_id == self.goal_id:
+-                    asyncio.create_task(self.end_goal())
+-                    return
++            if not location_id in self.location_ids:
++                logger.info("No checks to send: Song not in song pool")
++                return
+ 
+-                logger.info("Cleared song with appropriate grade!")
++        if int(song_data.get('scoreGrade')) >= self.grade_needed:
++            if location_id == self.goal_id:
++                asyncio.create_task(self.end_goal())
++                return
+ 
+-                for i in range(2):
+-                    self.found_checks.append(location_id + i)
++            logger.info("Cleared song with appropriate grade!")
+ 
+-                asyncio.create_task(self.send_checks())
+-            else:
+-                logger.info(f"Song {song_data.get('pvName')} was not beaten with a high enough grade")
++            for i in range(2):
++                self.found_checks.append(location_id + i)
++
++            asyncio.create_task(self.send_checks())
+         else:
+-            logger.info("No checks to send at BK but seeing this means your Client is OK!")
++            logger.info(f"Song {song_data.get('pvName')} was not beaten with a high enough grade")
++
++            if self.death_link and not song_data.get('deathLinked', False):
++                await self.send_death(f"The Disappearance of {self.player_names[self.slot]}")
+ 
+     async def end_goal(self):
+         message = [{"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}]
+@@ -372,6 +414,23 @@ class MegaMixContext(CommonContext):
      async def restore_songs(self):
          restore_originals(self.mod_pv_list)
  
@@ -166,9 +220,30 @@ index 1c00ecb..572a34d 100644
  def launch():
      """
 diff --git a/Options.py b/Options.py
-index 73daf6b..eb49bdd 100644
+index 73daf6b..07f3e0b 100644
 --- a/Options.py
 +++ b/Options.py
+@@ -120,14 +120,14 @@ class ScoreGradeNeeded(Choice):
+     """Completing a song will require a grade of this value or higher in order to unlock items.
+     Accuracy required is based on the song's difficulty (Easy, Normal, Hard, etc..)
+     A Perfect requires a full combo, regardless of accuracy.
+-
+     """
+     display_name = "Grade Needed"
+-    option_Standard = 0
+-    option_Great = 1
+-    option_Excellent = 2
+-    option_Perfect = 3
+-    default = 0
++    #option_Cheap = 1
++    option_Standard = 2
++    option_Great = 3
++    option_Excellent = 4
++    option_Perfect = 5
++    default = 2
+ 
+ 
+ class TotalLeeksAvailable(Range):
 @@ -175,6 +175,30 @@ class ModData(FreeText):
      visibility = Visibility.template | Visibility.spoiler
  
