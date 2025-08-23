@@ -10,5 +10,5 @@ If an issue is encountered with this release that is not in the latest Official 
 
 ### Resources
 - [Latest Unofficial Release](https://github.com/RePod/DivaAPworld-R/releases/latest) <sup>([Latest Official Release](https://github.com/Cynichill/DivaAPworld/releases/latest))</sup>
-- [Compare latest Official Release and UTB.](https://github.com/Cynichill/DivaAPworld/compare/main...testing) Diffs are applied on top of [`UPSTREAM_REF`](.github/workflows/build.yml) UTB.
+- [Compare latest Official Release and UTB.](https://github.com/Cynichill/DivaAPworld/compare/main...testing) Diffs are applied on top of [`UPSTREAM_REF_APWORLD`](.github/workflows/build.yml) UTB.
 - [UTB PR statuses as of latest Official Release](https://github.com/Cynichill/DivaAPworld/pulls?q=is%3Apr+base%3Atesting+updated%3A%3E2025-07-14) <sup>(dated 1.2.0B)</sup>
