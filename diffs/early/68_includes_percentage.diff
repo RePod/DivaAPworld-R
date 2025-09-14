@@ -1,0 +1,129 @@
+﻿diff --git a/Options.py b/Options.py
+index c37fe68..2e17c42 100644
+--- a/Options.py
++++ b/Options.py
+@@ -150,6 +150,18 @@ class LeeksRequiredPercentage(Range):
+     display_name = "Leek Percentage Needed to Win"
+ 
+ 
++class IncludeSongsPercentage(Range):
++    """The percentage of the seed reserved for Include Songs.
++    - At 50% a 100 song seed will reserve up to 50 Include Songs.
++    - If all Include Songs can fit in the given percent they will all appear.
++    - Non-Exclude Songs that are not selected stay in the song pool and can still appear.
++    - Include and Exclude a song to remove it from the song pool completely if not selected."""
++    range_start = 0
++    range_end = 100
++    default = 100
++    display_name = "Include Songs Percentage"
++
++
+ class IncludeSongs(ItemSet):
+     """Any song listed here will be guaranteed to be included as part of the seed.
+     - Difficulty options will be skipped for these songs.
+@@ -212,6 +224,7 @@ class MegaMixOptions(PerGameCommonOptions):
+     grade_needed: ScoreGradeNeeded
+     leek_count_percentage: TotalLeeksAvailable
+     leek_win_count_percentage: LeeksRequiredPercentage
++    include_songs_percentage: IncludeSongsPercentage
+     include_songs: IncludeSongs
+     exclude_songs: ExcludeSongs
+     exclude_singers: Removed
+diff --git a/__init__.py b/__init__.py
+index 0916ad3..f2874ba 100644
+--- a/__init__.py
++++ b/__init__.py
+@@ -150,17 +150,26 @@ class MegaMixWorld(World):
+         song_items = self.mm_collection.song_items
+ 
+         start_items = self.options.start_inventory.value.keys()
+-        include_songs = self.options.include_songs.value
++        include_songs = sorted(self.options.include_songs.value)
+         exclude_songs = self.options.exclude_songs.value
+ 
+         # The ModdedSongs group is shared across all players. Limit to own songs.
+         self.starting_songs = [s for s in start_items if s in song_items and
+                                not song_items.get(s).modded or song_items.get(s).songID in self.player_specific_ids]
+-        self.included_songs = [s for s in include_songs if s in song_items and s not in self.starting_songs and
++        included_songs = [s for s in include_songs if s in song_items and s not in self.starting_songs and
+                                not song_items.get(s).modded or song_items.get(s).songID in self.player_specific_ids]
+ 
+-        return [s for s in available_song_keys if s not in start_items
+-                and s not in include_songs and s not in exclude_songs]
++        # Open to suggestions to make includes% make sense without touching create_song_pool.
++        pool = [s for s in available_song_keys if s not in start_items
++                and s not in included_songs and s not in exclude_songs]
++        pool_size = 1 + min(len(pool + self.starting_songs + included_songs),
++                            self.options.starting_song_count.value + self.options.additional_song_count.value)
++        include_size = pool_size * self.options.include_songs_percentage.value // 100
++
++        self.included_songs = self.random.sample(included_songs, k=min(len(included_songs), include_size))
++        pool += [s for s in included_songs if s not in self.included_songs and s not in exclude_songs]
++
++        return pool
+ 
+     def create_song_pool(self, available_song_keys: List[str]):
+         starting_song_count = self.options.starting_song_count.value
+@@ -238,7 +247,7 @@ class MegaMixWorld(World):
+             return
+           
+         # Fill given percentage of remaining slots as Useful/non-progression dupes.
+-        dupe_count = floor(items_left * (self.options.duplicate_song_percentage / 100))
++        dupe_count = items_left * self.options.duplicate_song_percentage // 100
+         items_left -= dupe_count
+ 
+         # This is for the extraordinary case of needing to fill a lot of items.
+diff --git a/test/test_options.py b/test/test_options.py
+index 263f52d..3a0f98c 100644
+--- a/test/test_options.py
++++ b/test/test_options.py
+@@ -73,6 +73,35 @@ class TestOptionIncludesOverflow(MegaMixTestBase):
+         self.assertTrue(pool.issubset(world.options.include_songs.value))
+ 
+ 
++@classvar_matrix(percent=[10, 39, 99, 100])
++class TestIncludesPercentage(MegaMixTestBase):
++    """Set include_ and exclude_songs to an item group (MikuSongs) and verify the percentage of the seed for them.
++    Excluding the same songs guarantees they cannot appear in the song pool again."""
++    percent: ClassVar[int]
++    options = {
++        "allow_megamix_dlc_songs": True,
++        "duplicate_song_percentage": 0,
++        "starting_song_count": 10,
++        "additional_song_count": 40,
++    }
++
++    def test_includes_percentage(self):
++        group_miku = self.world.item_name_groups["MikuSongs"]
++        self.options["include_songs_percentage"] = self.percent
++        self.options["include_songs"] = group_miku
++        self.options["exclude_songs"] = group_miku
++        self.world_setup()
++
++        pool = {song.name for song in self.world.multiworld.itempool if song.code >= 10}
++        pool.update(self.world.starting_songs)
++        pool.add(self.world.victory_song_name)
++
++        match = {song for song in pool if song in group_miku}
++        count = len(pool) * self.percent // 100
++
++        self.assertEqual(len(match), count)
++
++
+ class TestOptionExcludes(MegaMixTestBase):
+     """Set exclude_songs and test the multiworld item pool for their absence."""
+     options = {
+diff --git a/test/test_plando.py b/test/test_plando.py
+index 38f439e..1897036 100644
+--- a/test/test_plando.py
++++ b/test/test_plando.py
+@@ -4,6 +4,9 @@ from ..Options import IncludeSongs, ExcludeSongs
+ class TestPlando(MegaMixTestBase):
+     """Test the handle_plando function directly.
+     See also: test_options"""
++    options = {
++        "allow_megamix_dlc_songs": True,
++    }
+ 
+     def _test_plando(self, exclude: bool = False):
+         """Shuffle song_items, pick out 60, allocate 30 to include/exclude, verify they're not returned."""
