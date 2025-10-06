@@ -1,0 +1,205 @@
+diff --git a/Client.py b/Client.py
+index 8360720..e34086c 100644
+--- a/Client.py
++++ b/Client.py
+@@ -4,6 +4,7 @@ import colorama
+ import os
+ import json
+ import time
++from pathlib import Path
+ from .DataHandler import (
+     game_paths,
+     load_json_file,
+@@ -81,6 +82,9 @@ class MegaMixContext(SuperContext):
+         self.songResultsLocation = f"{self.path}/{self.mod_name}/results.json"
+         self.deathLinkInLocation = f"{self.path}/{self.mod_name}/death_link_in"
+         self.deathLinkOutLocation = f"{self.path}/{self.mod_name}/death_link_out"
++        self.trapSuddenLocation = f"{self.path}/{self.mod_name}/sudden"
++        self.trapHiddenLocation = f"{self.path}/{self.mod_name}/hidden"
++        self.trapIconLocation = f"{self.path}/{self.mod_name}/icontrap"
+         self.modData = None
+         self.modded = False
+         self.freeplay = False
+@@ -215,6 +219,12 @@ class MegaMixContext(SuperContext):
+                     elif network_item.item == 2:
+                         # Maybe move static items out of MegaMixCollection instead of hard coding?
+                         pass
++                    elif network_item.item == 4:
++                        Path(self.trapHiddenLocation).touch()
++                    elif network_item.item == 5:
++                        Path(self.trapSuddenLocation).touch()
++                    elif network_item.item == 9:
++                        Path(self.trapIconLocation).touch()
+                     else:
+                         ids_to_packs.setdefault(self.song_id_to_pack(network_item.item), []).append(network_item.item)
+ 
+@@ -288,7 +298,6 @@ class MegaMixContext(SuperContext):
+ 
+     def on_deathlink(self, data: dict[str, any]):
+         super().on_deathlink(data)
+-        from pathlib import Path
+         Path(self.deathLinkInLocation).touch()
+ 
+ 
+diff --git a/MegaMixCollection.py b/MegaMixCollection.py
+index 43e8ccc..8ca1c84 100644
+--- a/MegaMixCollection.py
++++ b/MegaMixCollection.py
+@@ -25,6 +25,14 @@ class MegaMixCollections:
+         "SAFE": 1,
+     }
+ 
++    # IDs 3-9 available. 10 is "Love is War [1]".
++    trap_items: dict[str, int] = {
++        #"High Speed Trap": 3,
++        "Hidden Trap": 4,
++        "Sudden Trap": 5,
++        "Icon Trap": 9,
++    }
++
+     def __init__(self) -> None:
+         self.item_names_to_id = ChainMap({self.LEEK_NAME: self.LEEK_CODE}, self.filler_item_names, self.song_items)
+         self.location_names_to_id = ChainMap(self.song_locations)
+diff --git a/Options.py b/Options.py
+index 98aa4c7..724e3f9 100644
+--- a/Options.py
++++ b/Options.py
+@@ -2,6 +2,8 @@ from Options import Toggle, Option, Range, Choice, DeathLink, ItemSet, OptionSet
+     Visibility, Removed, OptionGroup
+ from dataclasses import dataclass
+ 
++from .MegaMixCollection import MegaMixCollections
++
+ 
+ class StartingSongs(Range):
+     """The number of songs that will be automatically unlocked at the start of a run."""
+@@ -24,8 +26,8 @@ class AdditionalSongs(Range):
+ 
+ class DuplicateSongPercentage(Range):
+     """
+-    Percentage of duplicate songs to place in remaining filler slots.
+-    Duplicate songs are considered Useful and thus out of logic.
++    After placing required items, the percentage of remaining filler slots to become duplicate song items.
++    Duplicate songs are considered Useful thus out of logic and may speed up completion time.
+     """
+     range_start = 0
+     range_end = 100
+@@ -213,6 +215,24 @@ class DeathLinkAmnesty(Range):
+     default = 0
+ 
+ 
++class TrapsEnabled(OptionSet):
++    """Control which Traps can be placed in the item pool."""
++    display_name = "Traps Enabled"
++    valid_keys = {trap for trap in MegaMixCollections.trap_items.keys()}
++    default = valid_keys
++
++
++class TrapPercentage(Range):
++    """
++    After placing required items and duplicate songs, the percentage of remaining filler slots to become traps.
++    If duplicate songs percentage is at 100, this option has no effect.
++    """
++    display_name = "Trap Percentage"
++    range_start = 0
++    range_end = 100
++    default = 0
++
++
+ megamix_option_groups = [
+     OptionGroup("Song Choice", [
+         AllowMegaMixDLCSongs,
+@@ -228,6 +248,12 @@ megamix_option_groups = [
+         DifficultyRatingMin,
+         DifficultyRatingMax,
+     ]),
++    OptionGroup("", [
++        DivaDeathLink,
++        DeathLinkAmnesty,
++        TrapsEnabled,
++        TrapPercentage,
++    ]),
+ ]
+ 
+ 
+@@ -248,7 +274,11 @@ class MegaMixOptions(PerGameCommonOptions):
+     include_songs_percentage: IncludeSongsPercentage
+     include_songs: IncludeSongs
+     exclude_songs: ExcludeSongs
+-    exclude_singers: Removed
+     megamix_mod_data: ModData
+     death_link: DivaDeathLink
+     death_link_amnesty: DeathLinkAmnesty
++    traps_enabled: TrapsEnabled
++    trap_percentage: TrapPercentage
++
++    # Deprecated
++    exclude_singers: Removed
+\ No newline at end of file
+diff --git a/__init__.py b/__init__.py
+index 23ef39d..893baae 100644
+--- a/__init__.py
++++ b/__init__.py
+@@ -238,6 +238,9 @@ class MegaMixWorld(World):
+         if name in self.mm_collection.filler_item_names:
+             return MegaMixFixedItem(name, ItemClassification.filler, self.mm_collection.filler_item_names.get(name), self.player)
+ 
++        if name in self.mm_collection.trap_items:
++            return MegaMixFixedItem(name, ItemClassification.trap, self.mm_collection.trap_items.get(name), self.player)
++
+         song = self.mm_collection.song_items.get(name)
+         self.final_song_ids.add(song.songID)
+         return MegaMixSongItem(name, self.player, song)
+@@ -282,6 +285,18 @@ class MegaMixWorld(World):
+             item.classification = ItemClassification.useful
+             self.multiworld.itempool.append(item)
+ 
++        # Traps after dupes, contrary to MD
++        trap_count = items_left * self.options.trap_percentage // 100
++        enabled_traps = list(self.options.traps_enabled.value)
++
++        if enabled_traps and trap_count:
++            for _ in range(0, trap_count):
++                trap = self.create_item(self.random.choice(enabled_traps))
++                self.multiworld.itempool.append(trap)
++
++            items_left -= trap_count  # subtract only if there are enabled traps
++
++        # Generic filler. Anything dupes and traps didn't cover.
+         filler_count = items_left
+         items_left -= filler_count
+ 
+diff --git a/docs/setup_en.md b/docs/setup_en.md
+index 9f23a7c..8ce9986 100644
+--- a/docs/setup_en.md
++++ b/docs/setup_en.md
+@@ -5,7 +5,7 @@
+   - [Extra Song Pack](https://store.steampowered.com/app/1887030/Hatsune_Miku_Project_DIVA_Mega_Mix_Extra_Song_Pack/) (optional, recommended, cheaper bundled)
+   - The game can be played in Archipelago without the Extra Song Pack DLC.
+ - [DivaModLoader](https://github.com/blueskythlikesclouds/DivaModLoader?tab=readme-ov-file#installation)
+-- [[GB]](https://gamebanana.com/mods/514140) Archipelago Mod
++- [[GB]](https://gamebanana.com/mods/514140) [[DMA]](https://divamodarchive.com/post/279) Archipelago Mod
+ 
+ ## First Time Setup
+ This is a minimal setup to get started. Mod managers exist that may make certain steps easier, but you use them at your discretion.
+diff --git a/test/test_options.py b/test/test_options.py
+index 3a0f98c..00efb1a 100644
+--- a/test/test_options.py
++++ b/test/test_options.py
+@@ -144,3 +144,15 @@ class TestOptionExcludeItemGroups(MegaMixTestBase):
+         intersect = pool.intersection(group_songs)
+         self.assertEqual(0, len(intersect), f"0 songs from {self.group} expected, got {len(intersect)}: {intersect}")
+         self.assertEqual(len(group_songs) + len(pool), len(self.world.mm_collection.song_items))
++
++
++class TestTrapsFull(MegaMixTestBase):
++    """Set trap settings to extremes and """
++    options = {
++        "duplicate_song_percentage": 0,
++        "trap_percentage": 100,
++    }
++
++    def test_traps_full(self):
++        world = self.get_world()
++        # TODO
+\ No newline at end of file
