@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM_REF_APWORLD: dec49dc915a224130208b61f2fda9d2d9e8e45d5
-  UPSTREAM_REF_FUZZER: bc563630a634f3f53f1975c9af7694db2efaee0d
+  UPSTREAM_REF_APWORLD: fc114cbb2e082493ee52a25662bf1d7b1fc1ede5
+  UPSTREAM_REF_FUZZER: 433eeadc4bdbdc7302810e7d72a7f6435dcd1062
 
 jobs:
   build:
@@ -35,7 +35,7 @@ jobs:
 
       - name: Archipelago | Setup
         run: |
-          find ./worlds -mindepth 1 -maxdepth 1 -type d -regextype posix-extended ! -regex '.*/(megamix|generic|alttp)' -exec rm -rf {} \;
+          find ./worlds -mindepth 1 -maxdepth 1 -type d -regextype posix-extended ! -regex '.*/(megamix|generic|alttp|apquest)' -exec rm -rf {} \;
           uv venv
           uv pip install pip pytest pytest-subtests pytest-xdist
           find -name requirements.txt | xargs -n1 uv pip install -r

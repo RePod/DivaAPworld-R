@@ -1,0 +1,883 @@
+diff --git a/Client.py b/Client.py
+index ffcc3ae..60bab21 100644
+--- a/Client.py
++++ b/Client.py
+@@ -89,7 +89,6 @@ class MegaMixContext(SuperContext):
+         self.modded = False
+         self.freeplay = False
+         self.mod_pv_list = []
+-        self.previous_received = []
+         self.sent_unlock_message = False
+ 
+         self.items_handling = 0b001 | 0b010 | 0b100  #Receive items from other worlds, starting inv, and own items
+@@ -99,12 +98,10 @@ class MegaMixContext(SuperContext):
+         self.item_name_to_ap_id = None
+         self.item_ap_id_to_name = None
+         self.checks_per_song = 2
+-        self.found_checks = []
+-        self.missing_checks = []  # Stores all location checks found, for filtering
+-        self.prev_found = []
+ 
+         self.seed_name = None
+         self.options = None
++        self.remap = None
+ 
+         self.goal_song = None
+         self.goal_id = None
+@@ -139,10 +136,9 @@ class MegaMixContext(SuperContext):
+ 
+             self.sent_unlock_message = False
+             self.leeks_obtained = 0
+-            self.missing_checks = args["missing_locations"]
+-            self.prev_found = args["checked_locations"]
+             self.location_ids = set(args["missing_locations"] + args["checked_locations"])
+             self.options = args["slot_data"]
++            self.remap = self.options.get("modRemap", {})
+             self.goal_song = self.options["victoryLocation"]
+             self.goal_id = self.options["victoryID"]
+             self.autoRemove = self.options["autoRemove"]
+@@ -171,18 +167,16 @@ class MegaMixContext(SuperContext):
+                 time.sleep(1)
+ 
+         if cmd == "ReceivedItems":
+-            # If receiving an item, only append that item
+-            asyncio.create_task(self.receive_item())
++            asyncio.create_task(self.receive_item(args.get("index", 0)))
+ 
+         if cmd == "RoomInfo":
+             self.seed_name = args['seed_name']
+ 
+-        elif cmd == "DataPackage":
++        if cmd == "DataPackage":
+             if not self.location_ids:
+                 # Connected package not recieved yet, wait for datapackage request after connected package
+                 return
+             self.leeks_obtained = 0
+-            self.previous_received = []
+ 
+             self.location_name_to_ap_id = args["data"]["games"]["Hatsune Miku Project Diva Mega Mix+"]["location_name_to_id"]
+             self.location_name_to_ap_id = {
+@@ -197,6 +191,10 @@ class MegaMixContext(SuperContext):
+             # If receiving data package, resync previous items
+             asyncio.create_task(self.receive_item())
+ 
++        if cmd == "RoomUpdate":
++            if "checked_locations" in args:
++                pass
++
+     def song_id_to_pack(self, item_id):
+         target_song_id = int(item_id) // 10
+ 
+@@ -206,35 +204,31 @@ class MegaMixContext(SuperContext):
+                     return pack
+         return "ArchipelagoMod"
+ 
+-    async def receive_item(self):
++    async def receive_item(self, index: int = 0):
++        if index == 0:
++            self.leeks_obtained = 0
++
+         async with self.critical_section_lock:
+             ids_to_packs = {}
+ 
+-            for network_item in self.items_received:
+-                if network_item not in self.previous_received:
+-                    self.previous_received.append(network_item)
+-                    if network_item.item == 1:
+-                        self.leeks_obtained += 1
+-                        self.check_goal()
+-                    elif network_item.item == 2:
+-                        # Maybe move static items out of MegaMixCollection instead of hard coding?
+-                        pass
+-                    elif network_item.item == 4:
+-                        if not os.path.isfile(self.trapHiddenLocation):
+-                            Path(self.trapHiddenLocation).touch()
+-                    elif network_item.item == 5:
+-                        if not os.path.isfile(self.trapSuddenLocation):
+-                            Path(self.trapSuddenLocation).touch()
+-                    elif network_item.item == 9:
+-                        if not os.path.isfile(self.trapIconLocation):
+-                            Path(self.trapIconLocation).touch()
+-                    else:
+-                        ids_to_packs.setdefault(self.song_id_to_pack(network_item.item), set()).add(network_item.item)
++            for network_item in self.items_received[index:]:
++                if network_item.item >= 10:
++                    ids_to_packs.setdefault(self.song_id_to_pack(network_item.item), set()).add(network_item.item)
++                elif network_item.item == 1:
++                    self.leeks_obtained += 1
++                    self.check_goal()
++                elif network_item.item == 2:
++                    pass # Filler
++                elif network_item.item == 4:
++                    Path(self.trapHiddenLocation).touch()
++                elif network_item.item == 5:
++                    Path(self.trapSuddenLocation).touch()
++                elif network_item.item == 9:
++                    Path(self.trapIconLocation).touch()
+ 
+             for song_pack in ids_to_packs:
+                 song_unlock(self.path, ids_to_packs.get(song_pack), False, song_pack)
+ 
+-
+     def check_goal(self):
+         if not self.leek_label:
+             from kivymd.uix.label import MDLabel
+@@ -311,11 +305,13 @@ class MegaMixContext(SuperContext):
+             logger.info("No checks to send at BK but seeing this means your Client is OK!")
+             return
+ 
+-        location_id = int(song_data.get('pvId') * 10)
++        # Check for remaps
++        song_id = song_data.get('pvId')
++        location_id = self.remap.get(str(song_id), song_id * 10)
+         location_checks = set(range(location_id, location_id + self.checks_per_song))
+ 
+         if not location_id == self.goal_id:
+-            if location_checks.issubset(set(self.prev_found)):
++            if location_checks.issubset(set(self.checked_locations)):
+                 logger.info("No checks to send: Song checks previously sent or collected")
+                 return
+ 
+@@ -330,10 +326,7 @@ class MegaMixContext(SuperContext):
+ 
+             logger.info("Cleared song with appropriate grade!")
+ 
+-            for i in range(2):
+-                self.found_checks.append(location_id + i)
+-
+-            asyncio.create_task(self.send_checks())
++            asyncio.create_task(self.send_checks(location_checks))
+         else:
+             logger.info(f"Song {song_data.get('pvName')} was not beaten with a high enough grade")
+ 
+@@ -350,50 +343,22 @@ class MegaMixContext(SuperContext):
+ 
+         await self.send_msgs(message)
+ 
+-    async def send_checks(self):
+-        message = [{"cmd": 'LocationChecks', "locations": self.found_checks}]
+-        await self.send_msgs(message)
+-        self.remove_found_checks()
+-        self.found_checks.clear()
++    async def send_checks(self, locations: set):
++        await self.check_locations(locations)
+         if self.autoRemove and not self.freeplay:
+             await self.remove_songs()
+ 
+-    def remove_found_checks(self):
+-        self.prev_found += self.found_checks
+-        self.missing_checks = [item for item in self.missing_checks if item not in self.found_checks]
+-
+     async def get_uncleared(self):
++        prev_items = {i for item in self.items_received for i in (item.item, item.item + 1)}
++        missing_locations = {loc // 10 for loc in self.missing_locations if loc in prev_items}
+ 
+-        prev_items = []
+-        missing_locations = set()  # Convert to set if it's not already
+-        logged_pairs = set()  # To keep track of logged pairs
+-
+-        # Get a list of all item names that have been received
+-        for network_item in self.previous_received:
+-            item_id = network_item.item // 10
+-            prev_items.append(item_id)
+-
+-        for location in self.missing_checks:
+-            # Change location name to match item name
+-            if location not in missing_locations:
+-                if location // 10 in prev_items:
+-                    missing_locations.add(location)
+-
+-        # Now log pairs of locations
+-        for location in missing_locations:
+-            pair_last_digit = location % 2
+-            paired_location = location - pair_last_digit + (1 - pair_last_digit)  # Flip last digit
+-
+-            # Only log if the pair hasn't been logged yet
+-            pair_key = (min(location, paired_location), max(location, paired_location))
+-            if pair_key not in logged_pairs:
+-                logger.info(f"{self.location_ap_id_to_name[location][:-2]} is uncleared")
+-                logged_pairs.add(pair_key)
++        for location in sorted(missing_locations):
++            location = self.remap.get(str(location), location * 10)
++            logger.info(f"{self.item_ap_id_to_name[location]} is uncleared")
+ 
+         if self.leeks_obtained >= self.leeks_needed:
+             logger.info(f"Goal song: {self.goal_song} is unlocked.")
+ 
+-        # Check goal and if missingLocations is empty
+         if not missing_locations:
+             logger.info("All available songs cleared")
+ 
+@@ -411,7 +376,8 @@ class MegaMixContext(SuperContext):
+             logger.info("Auto Remove Set to Off")
+ 
+     async def remove_songs(self):
+-        finished_songs = self.prev_found[::self.checks_per_song]
++        missing = {songID // 10 for songID in self.missing_locations}
++        finished_songs = {songID for songID in self.checked_locations - self.missing_locations if songID // 10 not in missing}
+ 
+         ids_to_packs = {}
+         for item in finished_songs:
+@@ -425,12 +391,11 @@ class MegaMixContext(SuperContext):
+     async def freeplay_toggle(self):
+         self.freeplay = not self.freeplay
+ 
+-        song_ids = {location_id for location_id in sorted(self.location_ids)[::self.checks_per_song]
+-                    if location_id not in [i.item for i in self.previous_received]}
++        received = {recv.item // 10 for recv in self.items_received if recv.item >= 10}
++        song_ids = {loc for loc in self.location_ids if loc // 10 not in received}
+ 
+         if not self.freeplay:
+-            song_ids = {received.item for received in self.previous_received if received.item in self.missing_checks}
+-
++            song_ids = received
+             if self.leeks_obtained >= self.leeks_needed:
+                 song_ids.add(self.goal_id)
+         elif self.leeks_obtained < self.leeks_needed:
+@@ -451,6 +416,11 @@ class MegaMixContext(SuperContext):
+         await self.restore_songs()
+         await super().shutdown()
+ 
++    def make_gui(self):
++        ui = super().make_gui()
++        ui.base_title = "Mega Mix Client"
++        return ui
++
+     async def toggle_deathlink(self, amnesty: str = ""):
+         if amnesty:
+             if int(amnesty) > -1:
+diff --git a/DataHandler.py b/DataHandler.py
+index f1fcbe2..a4eb4bf 100644
+--- a/DataHandler.py
++++ b/DataHandler.py
+@@ -12,6 +12,7 @@ import filecmp
+ from typing import Any
+ 
+ from .MegaMixSongData import dlc_ids
++from .SymbolFixer import format_song_name
+ 
+ # Set up logger
+ logging.basicConfig(level=logging.DEBUG)
+@@ -30,7 +31,7 @@ def game_paths() -> dict[str, str]:
+     dml_config = os.path.join(game_path, "config.toml")
+     if os.path.isfile(dml_config):
+         with open(dml_config, "r") as f:
+-            mod_line = re.search(r"""^mods\s*=\s*['"](.*?)['"]""", f.read())
++            mod_line = re.search(r"""^mods\s*=\s*['"](.*?)['"]""", f.read(), re.MULTILINE)
+             if mod_line:
+                 mods_path = os.path.join(game_path, mod_line.group(1))
+ 
+@@ -166,7 +167,7 @@ def remove_song(pv_db: str, songs: str) -> str:
+     return re.sub(rf"^(pv_(?!(144|700)\.)({songs})\.difficulty\.(?:easy|normal|hard|extreme).length=\d)$", r"#ARCH#\g<1>", pv_db, flags=re.MULTILINE)
+ 
+ 
+-def extract_mod_data_to_json() -> list[Any]:
++def extract_mod_data_to_json() -> list[dict[str, list[tuple[str,int,int]]]]:
+     """
+     Extracts mod data from YAML files and converts it to a list of dictionaries.
+     """
+@@ -176,42 +177,35 @@ def extract_mod_data_to_json() -> list[Any]:
+ 
+     logger.debug(f"Checking YAMLs for megamix_mod_data at {folder_path}")
+ 
+-    # Search text for the specific game
+-    search_text = "Hatsune Miku Project Diva Mega Mix+"
++    if not os.path.isdir(folder_path):
++        logger.debug(f"The path {folder_path} is not a valid directory. Modded songs are unavailable for this path.")
++        return []
+ 
+-    # Regex pattern to capture the outermost curly braces content
+-    mod_data_pattern = r"megamix_mod_data:\s*(?:#.*\n)?\s*('.*')"
++    game_key = "Hatsune Miku Project Diva Mega Mix+"
++    mod_data_key = "megamix_mod_data"
+ 
+-    # Initialize an empty list to collect all inputs
+     all_mod_data = []
+ 
+-    if not os.path.isdir(folder_path):
+-        logger.debug(f"The path {folder_path} is not a valid directory. Modded songs are unavailable for this path.")
+-    else:
+-        for item in os.listdir(folder_path):
+-            item_path = os.path.join(folder_path, item)
++    for item in os.scandir(folder_path):
++        if not item.is_file():
++            continue
+ 
+-            if os.path.isfile(item_path):
+-                try:
+-                    with open(item_path, 'r', encoding='utf-8') as file:  # Open the file in read mode
+-                        file_content = file.read()
++        try:
++            with open(item.path, 'r', encoding='utf-8') as file:
++                file_content = file.read()
+ 
+-                        # Check if the search text (game title) is found in the file
+-                        if search_text in file_content:
+-                            # Search for all occurrences of 'megamix_mod_data:' and the block within {}
+-                            matches = re.findall(mod_data_pattern, file_content)
++                if mod_data_key not in file_content:
++                    continue
+ 
+-                            # Process each mod_data block
+-                            for _ in matches:
+-                                for single_yaml in yaml.safe_load_all(file_content):
+-                                    mod_data_content = single_yaml.get("Hatsune Miku Project Diva Mega Mix+", {}).get("megamix_mod_data", None)
++                for single_yaml in yaml.safe_load_all(file_content):
++                    mod_data_content = single_yaml.get(game_key, {}).get(mod_data_key, None)
+ 
+-                                    if isinstance(mod_data_content, dict) or not mod_data_content:
+-                                        continue
++                    if not mod_data_content or isinstance(mod_data_content, dict):
++                        continue
+ 
+-                                    all_mod_data.append(json.loads(mod_data_content))
+-                except Exception as e:
+-                    logger.warning(f"Failed to extract mod data from {item}\n{e}")
++                    all_mod_data.append(json.loads(mod_data_content))
++        except Exception as e:
++            logger.warning(f"Failed to extract mod data from {item.name}: {e}")
+ 
+     total = sum(len(pack) for packList in all_mod_data for pack in packList.values())
+     logger.debug(f"Found {total} songs")
+@@ -219,17 +213,20 @@ def extract_mod_data_to_json() -> list[Any]:
+     return all_mod_data
+ 
+ 
+-def get_player_specific_ids(mod_data):
+-    song_ids = []  # Initialize an empty list to store song IDs
+-
+-    if mod_data == "":
+-        return {}, song_ids
++def get_player_specific_ids(mod_data, remap: dict[int, dict[str, list]]) -> (dict, list, dict):
++    try:
++        data_dict = json.loads(mod_data)
++    except Exception as e:
++        logger.warning(f"Failed to extract player specific IDs: {e}")
++        return {}, [], {}
+ 
+-    data_dict = json.loads(mod_data)
++    flat_songs = {song[1]: song[0] for pack, songs in data_dict.items() for song in songs}
++    conflicts = remap.keys() & flat_songs.keys()
+ 
+-    for pack_name, songs in data_dict.items():
+-        for song in songs:
+-            song_id = song[1]
+-            song_ids.append(song_id)
++    player_remapped = {}
++    for song_id in conflicts:
++        name = format_song_name(flat_songs[song_id], song_id)
++        if name in remap[song_id]:
++            player_remapped.update({song_id: remap[song_id][name][0]})
+ 
+-    return data_dict, song_ids  # Return the list of song IDs
++    return data_dict, list(flat_songs.keys()), player_remapped  # Return the list of song IDs
+diff --git a/MegaMixCollection.py b/MegaMixCollection.py
+index 7c654d2..1a7027c 100644
+--- a/MegaMixCollection.py
++++ b/MegaMixCollection.py
+@@ -1,13 +1,16 @@
+ # Local
+ from .Items import SongData
+-from .SymbolFixer import fix_song_name
+-from .MegaMixSongData import SONG_DATA
++from .SymbolFixer import format_song_name
++from .MegaMixSongData import SONG_DATA, base_game_ids, dlc_ids
+ from .DataHandler import extract_mod_data_to_json
+ 
+ # Python
+ from typing import Dict, List
+ from collections import ChainMap
++import logging
+ 
++logging.basicConfig(level=logging.DEBUG)
++logger = logging.getLogger(__name__)
+ 
+ class MegaMixCollections:
+     """Contains all the data of MegaMix, loaded from songData.json"""
+@@ -40,18 +43,53 @@ class MegaMixCollections:
+ 
+         self.song_items = SONG_DATA
+         mod_data = extract_mod_data_to_json()
+-        base_game_ids = {song_data.songID for song_data in SONG_DATA.values() if song_data.songID is not None}
++
++        self.mod_remaps: dict[int, dict[str, list]] = {}
+ 
+         if mod_data:
++            seen_mod_song_ids = set()
++            seen_mod_item_ids = set()
++
+             for data_dict in mod_data:
+-                for _, songs in data_dict.items():
++                for pack, songs in data_dict.items():
+                     for song in songs:
++                        if not isinstance(song, list) or not list(map(type, song)) == [str, int, int]:
++                            logger.warning("Skipping", pack, song)
++                            continue
++
+                         song_id = song[1]
+-                        song_name = f"{fix_song_name(song[0])} [{song_id}]"
+-                        item_id = (song_id * 10)
+-                        # If cover song
++
+                         if song_id in base_game_ids:
+-                            item_id += 1
++                            continue
++
++                        song_name = format_song_name(song[0], song_id)
++                        item_id = (song_id * 10)
++
++                        if song_name in self.song_items:
++                            logger.warning(f"{song_name} previously mapped to base ID, skipping")
++                            continue
++
++                        # Remap up to 4 ID conflicts using the 8 free slots (2-9) between item/loc IDs.
++                        if song_id in seen_mod_song_ids:
++                            if song_id in self.mod_remaps and song_name in self.mod_remaps[song_id]:
++                                logger.warning(f"{song_name} already remapped to {self.mod_remaps[song_id][song_name]}")
++                                continue
++
++                            resolve = {i for i in range(item_id + 2, item_id + 10)}
++                            resolve -= seen_mod_item_ids
++                            new_slots = sorted(resolve)[0:2]
++
++                            if len(new_slots) != 2:
++                                raise Exception(f"Could not remap conflict of {song_name} (out of slots)\n"
++                                                f"{self.mod_remaps[song_id]}")
++                            logger.warning(f"Remapped {song_name} to {new_slots}")
++
++                            item_id = new_slots[0]
++                            seen_mod_item_ids.update(new_slots)
++
++                            self.mod_remaps.setdefault(song_id, {})
++                            self.mod_remaps[song_id][song_name] = new_slots
++                        seen_mod_song_ids.add(song_id)
+ 
+                         # Shift difficulty bitfields from modded data into [#,#,#,#,#]
+                         diff_info = []
+@@ -62,20 +100,14 @@ class MegaMixCollections:
+                             diff_info.insert(0, diff + (.5 if half else 0.0))
+                             song[2] >>= 5
+ 
+-                        self.song_items[song_name] = SongData(item_id, song_id, [], False, True, diff_info)
++                        self.song_items[song_name] = SongData(item_id, song_id, set(), song_id in dlc_ids, True, diff_info)
+ 
+         self.item_names_to_id.update({name: data.code for name, data in self.song_items.items()})
+ 
+         for song_name, song_data in self.song_items.items():
+-            if song_data.code % 2 != 0:  # Fix code for covers
+-                for i in range(2):
+-                    self.song_locations[f"{song_name}-{i}"] = (song_data.code + i - 1)
+-                continue
+-
+             for i in range(2):
+                 self.song_locations[f"{song_name}-{i}"] = (song_data.code + i)
+ 
+-
+     def get_songs_with_settings(self, dlc: bool, mod_ids: List[int], allowed_diff: List[int], diff_lower: float, diff_higher: float) -> List[str]:
+         """Gets a list of all songs that match the filter settings. Difficulty thresholds are inclusive."""
+         filtered_list = []
+diff --git a/Options.py b/Options.py
+index ab8f926..6e51ef3 100644
+--- a/Options.py
++++ b/Options.py
+@@ -14,8 +14,8 @@ class StartingSongs(Range):
+ 
+ 
+ class AdditionalSongs(Range):
+-    """The total number of songs that will be placed in the randomization pool.
+-    - This does not count any starting songs or the goal song.
++    """The total number of songs that will be placed in the randomisation pool.
++    - This does not count any Starting Songs or the Goal Song.
+     - The final song count may be lower due to other settings.
+     """
+     range_start = 15
+@@ -48,7 +48,7 @@ class AutoRemoveCleared(Toggle):
+ 
+ 
+ class DifficultyModeMin(Choice):
+-    """Minimum difficulty that a song can be selected from"""
++    """Minimum difficulty that a song can be selected from."""
+     display_name = "Manual Difficulty Min"
+     option_Easy = 0
+     option_Normal = 1
+@@ -59,7 +59,7 @@ class DifficultyModeMin(Choice):
+ 
+ 
+ class DifficultyModeMax(Choice):
+-    """Maximum difficulty that a song can be selected from"""
++    """Maximum difficulty that a song can be selected from."""
+     display_name = "Manual Difficulty Max"
+     option_Easy = 0
+     option_Normal = 1
+@@ -118,7 +118,7 @@ class DifficultyRatingMax(Choice):
+     option_nine = 16
+     option_9x5 = 17
+     option_ten = 18
+-    default = 18
++    default = 14
+ 
+ 
+ class ScoreGradeNeeded(Choice):
+@@ -148,7 +148,7 @@ class TotalLeeksAvailable(Range):
+ 
+ 
+ class LeeksRequiredPercentage(Range):
+-    """The percentage of Leeks in the item pool that are needed to unlock the winning song."""
++    """The percentage of Leeks in the item pool that are needed to unlock the Goal Song."""
+     range_start = 50
+     range_end = 100
+     default = 80
+@@ -192,7 +192,7 @@ class ExcludeSongs(ItemSet):
+ 
+ 
+ class ModData(FreeText):
+-    """If you are using modded songs, delete the option below entirely and paste the string from the DivaJSON Tool here"""
++    """To play with mod songs, set the output of the Mega Mix JSON Generator here."""
+     display_name = "MegaMixModData"
+     default = ''
+     visibility = Visibility.template | Visibility.spoiler
+@@ -221,7 +221,8 @@ class DeathLinkAmnesty(Range):
+ 
+ 
+ class TrapsEnabled(OptionSet):
+-    """Control which Traps can be placed in the item pool."""
++    """Control which Traps can be placed in the item pool.
++    It is highly recommended to add these Traps to non_local_items."""
+     display_name = "Traps Enabled"
+     valid_keys = {trap for trap in MegaMixCollections.trap_items.keys()}
+     default = valid_keys
+@@ -230,7 +231,7 @@ class TrapsEnabled(OptionSet):
+ class TrapPercentage(Range):
+     """
+     After placing required items and duplicate songs, the percentage of remaining filler slots to become traps.
+-    If duplicate songs percentage is at 100, this option has no effect.
++    If Duplicate Song Percentage is at 100, this option has no effect.
+     """
+     display_name = "Trap Percentage"
+     range_start = 0
+@@ -239,6 +240,13 @@ class TrapPercentage(Range):
+ 
+ 
+ megamix_option_groups = [
++    OptionGroup("Game Length", [
++        StartingSongs,
++        AdditionalSongs,
++        DuplicateSongPercentage,
++        TotalLeeksAvailable,
++        LeeksRequiredPercentage,
++    ]),
+     OptionGroup("Song Choice", [
+         AllowMegaMixDLCSongs,
+         GoalSongs,
+@@ -247,18 +255,18 @@ megamix_option_groups = [
+         ExcludeSongs,
+         ModData, # hidden by visibility property
+     ]),
+-    OptionGroup("Difficulty", [
++    OptionGroup("Song Difficulty", [
+         ScoreGradeNeeded,
+         DifficultyModeMin,
+         DifficultyModeMax,
+         DifficultyRatingMin,
+         DifficultyRatingMax,
+     ]),
+-    OptionGroup("", [
++    OptionGroup("Game Modifiers", [
+         DivaDeathLink,
+         DeathLinkAmnesty,
+-        TrapsEnabled,
+         TrapPercentage,
++        TrapsEnabled,
+     ]),
+ ]
+ 
+diff --git a/SymbolFixer.py b/SymbolFixer.py
+index f05c0bd..34a0217 100644
+--- a/SymbolFixer.py
++++ b/SymbolFixer.py
+@@ -125,3 +125,7 @@ def fix_song_name(song_name):
+     cleaned_song_name = replace_non_ascii_with_space(cleaned_song_name)  # After conversion, replace any remainders with blanks
+     cleaned_song_name = special_char_removal(cleaned_song_name)
+     return cleaned_song_name
++
++
++def format_song_name(name: str, song_id: int):
++    return f"{fix_song_name(name)} [{song_id}]"
+diff --git a/__init__.py b/__init__.py
+index 4a42316..a819d9a 100644
+--- a/__init__.py
++++ b/__init__.py
+@@ -84,6 +84,7 @@ class MegaMixWorld(World):
+ 
+     topology_present = False
+     web = MegaMixWebWorld()
++    ut_can_gen_without_yaml = True
+ 
+     # Necessary Data
+     mm_collection = MegaMixCollections()
+@@ -95,8 +96,9 @@ class MegaMixWorld(World):
+     item_name_groups = mm_collection.get_item_name_groups()
+ 
+     # Working Data
+-    player_specific_mod_data = {}
+-    player_specific_ids = {}
++    player_mod_data = {}
++    player_mod_ids = {}
++    player_mod_remap = {}
+     victory_song_name: str = ""
+     victory_song_id: int
+     starting_songs: List[str] = []
+@@ -110,6 +112,25 @@ class MegaMixWorld(World):
+         if re_gen_passthrough and self.game in re_gen_passthrough:
+             slot_data: dict[str, any] = re_gen_passthrough[self.game]
+ 
++            # Inject mod data, remap as needed
++            from .SymbolFixer import format_song_name
++            from .Items import SongData
++            for pack, items in slot_data.get("modData", {}).items():
++                for item in items: # for name, song_id in items
++                    # Temporary back-compat for testing on older world gens
++                    name = item[0] if len(item) == 2 else "Modded Song"
++                    song_id = item[-1]
++
++                    formatted_name = format_song_name(name, song_id)
++
++                    remap = slot_data.get("modRemap", {})
++                    item_id = remap.get(str(song_id), song_id * 10)
++
++                    self.mm_collection.song_items[formatted_name] = SongData(item_id, song_id, set(), False, True, [])
++                    for i in range(2):
++                        self.mm_collection.song_locations[f"{formatted_name}-{i}"] = (item_id + i)
++            self.item_id_to_name.update({data.code: name for name, data in self.mm_collection.song_items.items()})
++
+             if "finalSongIDs" in slot_data:
+                 final = slot_data.get("finalSongIDs", [])
+                 self.included_songs = [key for key, song in self.mm_collection.song_items.items() if song.songID in final]
+@@ -119,13 +140,13 @@ class MegaMixWorld(World):
+         # Initial search criteria
+         lower_rating_threshold, higher_rating_threshold = self.get_difficulty_range()
+         lower_diff_threshold, higher_diff_threshold = self.get_available_difficulties(self.options.song_difficulty_min.value, self.options.song_difficulty_max.value)
+-        self.player_specific_mod_data, self.player_specific_ids = get_player_specific_ids(self.options.megamix_mod_data.value)
++        self.player_mod_data, self.player_mod_ids, self.player_mod_remap = get_player_specific_ids(self.options.megamix_mod_data.value, self.mm_collection.mod_remaps)
+ 
+         while True:
+             # In most cases this should only need to run once
+ 
+             allowed_difficulties = list(range(lower_diff_threshold, higher_diff_threshold + 1))
+-            available_song_keys = self.mm_collection.get_songs_with_settings(self.options.allow_megamix_dlc_songs, self.player_specific_ids, allowed_difficulties, lower_rating_threshold, higher_rating_threshold)
++            available_song_keys = self.mm_collection.get_songs_with_settings(bool(self.options.allow_megamix_dlc_songs.value), self.player_mod_ids, allowed_difficulties, lower_rating_threshold, higher_rating_threshold)
+ 
+             available_song_keys = self.handle_plando(available_song_keys)
+             #print(f"{lower_rating_threshold}~{higher_rating_threshold}* {allowed_difficulties}", len(available_song_keys))
+@@ -170,9 +191,9 @@ class MegaMixWorld(World):
+ 
+         # The ModdedSongs group is shared across all players. Limit to own songs.
+         self.starting_songs = [s for s in start_items if s in song_items and
+-                               not song_items.get(s).modded or song_items.get(s).songID in self.player_specific_ids]
++                               not song_items.get(s).modded or song_items.get(s).songID in self.player_mod_ids]
+         included_songs = [s for s in include_songs if s in song_items and s not in self.starting_songs and
+-                               not song_items.get(s).modded or song_items.get(s).songID in self.player_specific_ids]
++                               not song_items.get(s).modded or song_items.get(s).songID in self.player_mod_ids]
+ 
+         # Handle goal before inc%
+         if goal_songs:
+@@ -238,7 +259,7 @@ class MegaMixWorld(World):
+                 self.included_songs.append(available_song_keys.pop())
+ 
+         victory_song = self.mm_collection.song_items.get(self.victory_song_name)
+-        self.victory_song_id = victory_song.code
++        self.victory_song_id = (victory_song.code // 10) * 10
+         self.final_song_ids.add(victory_song.songID)
+         self.location_count = 2 * (len(self.starting_songs) + len(self.included_songs))
+ 
+@@ -348,8 +369,8 @@ class MegaMixWorld(World):
+         # Generate the number_to_option_value dictionary using the formula
+         number_to_option_value = {i: 1 + i * 0.5 if i % 2 != 0 else int(1 + i * 0.5) for i in range(19)}
+ 
+-        minimum_difficulty = number_to_option_value.get(self.options.song_difficulty_rating_min, None)
+-        maximum_difficulty = number_to_option_value.get(self.options.song_difficulty_rating_max, None)
++        minimum_difficulty = number_to_option_value.get(self.options.song_difficulty_rating_min.value, None)
++        maximum_difficulty = number_to_option_value.get(self.options.song_difficulty_rating_max.value, None)
+         difficulty_bounds = [min(minimum_difficulty, maximum_difficulty), max(minimum_difficulty, maximum_difficulty)]
+ 
+         return difficulty_bounds
+@@ -378,6 +399,7 @@ class MegaMixWorld(World):
+             "autoRemove": bool(self.options.auto_remove_songs),
+             "deathLink": self.options.death_link.value,
+             "deathLink_Amnesty": self.options.death_link_amnesty.value,
+-            "modData": {pack: [song[1] for song in songs if song[1] in self.final_song_ids]
+-                        for pack, songs in self.player_specific_mod_data.items()},
++            "modData": {pack: [[song[0], song[1]] for song in songs if song[1] in self.final_song_ids]
++                        for pack, songs in self.player_mod_data.items()},
++            "modRemap": self.player_mod_remap,
+         }
+diff --git a/docs/setup_en.md b/docs/setup_en.md
+index c26b97d..6a2769e 100644
+--- a/docs/setup_en.md
++++ b/docs/setup_en.md
+@@ -11,67 +11,70 @@
+ This is a minimal setup to get started. Mod managers exist that may make certain steps easier, but you use them at your discretion.
+ 
+ 1. If not already installed, [follow DivaModLoader's installation steps.](https://github.com/blueskythlikesclouds/DivaModLoader?tab=readme-ov-file#installation)
+-   - See 3 for locating `DivaMegaMix.exe`
++   - See below for locating `DivaMegaMix.exe`
+ 2. Install the Archipelago Mod listed under [Requirements.](#requirements)
+-3. Upon starting the **Mega Mix Client** you will be prompted to select `DivaMegaMix.exe`:
++3. Start the **Mega Mix Client** from the Archipelago Launcher
++4. You may be prompted to select `DivaMegaMix.exe`:
++   - If you are not prompted, skip these steps
+    - Right-click the game entry in Steam, **Manage > Browse local files**
+    - `DivaMegaMix.exe` (extension may be hidden) is what you will need to navigate to and select
+    - You may be able to ***Ctrl+C*** the game EXE and paste its path into the original prompt's text input
+-4. Play! (requires a [YAML and generation](tutorial/Archipelago/setup_en))
++5. Play! (requires a [YAML and generation](/tutorial/Archipelago/setup_en))
+ 
+ ### Resulting basic file structure
+ ```
+ Hatsune Miku Project DIVA Mega Mix Plus\
+-├ DivaMegaMix.exe <─ game, select when prompted by Client/JSON generator
+-├ dinput8.dll <─ mod loader
+-├ config.toml <─ mod loader config (no need to edit)
++├ DivaMegaMix.exe   <─ game, select if prompted by Client/JSON generator
++├ dinput8.dll       <─ mod loader
++├ config.toml       <─ mod loader config (no need to edit)
+ └ mods\
+   └ ArchipelagoMod\ <─ AP mod, currently required to be this name
+-    └ config.toml <─ AP mod config
++    └ config.toml   <─ AP mod config
+ ```
+ 
+-## Optional Quality of Life Mods
+-- [[GB]](https://gamebanana.com/mods/388083) ExPatch
+-- [[GB]](https://gamebanana.com/mods/380955) High Frame Rate
+-- [[GB]](https://gamebanana.com/mods/449088) [[DMA]](https://divamodarchive.com/post/193) IntroPatch
+-- [[GB]](https://gamebanana.com/mods/427425) KeepFocus
+-- [[GB]](https://gamebanana.com/mods/414252) Mega Mix Thumbnail Manager
++## Optional Quality of Life Mods 
++Please read descriptions before installing. These may not be relevant to you or may require additional files.
++
++| Mod                  | Sources                                                                                              |
++|----------------------|------------------------------------------------------------------------------------------------------|
++| ExPatch              | [[GB]](https://gamebanana.com/mods/388083) [[GH]](https://github.com/nastys/ExPatch/releases/latest) |
++| High Frame Rate      | [[GB]](https://gamebanana.com/mods/380955)                                                           |
++| IntroPatch           | [[GB]](https://gamebanana.com/mods/449088) [[DMA]](https://divamodarchive.com/post/193)              |
++| KeepFocus            | [[GB]](https://gamebanana.com/mods/427425)                                                           |
++| Reach LV39 Instantly | [[GB]](https://gamebanana.com/mods/397158)                                                           |                                            
++| ThumbnailSplitter    | [[GB]](https://gamebanana.com/mods/625557)                                                           |
+ 
+ ## Mod Songs
+ **Note: Currently, using mod songs requires the seed to be [generated locally](/tutorial/Archipelago/setup_en#generating-a-multiplayer-game), not on the website. Hosting on the website afterwards is fine.**
+ 
+-Open the **Mega Mix JSON Generator** from the Archipelago Launcher.
+-
+-Checked song packs will be included in the song selection pool and have their visibility in-game controlled when using the **Mega Mix Client**. Packs left unchecked will not be included in the selection pool and may remain visible in-game. Disable these manually, such as in their `config.toml`, if you do not want to see them.
++1. Open the **Mega Mix JSON Generator** from the Archipelago Launcher.
++2. Check song packs you would like to appear in your song selection pool. Unchecked packs will remain visible in game unless manually disabled.
++3. When done checking packs click **Generate Mod String**.
++4. In your YAML on the line for `megamix_mod_data` paste and format it as such:
++   - `megamix_mod_data: '{"MyFirstSongPack":[["MyFirstSong",144,224]]}'`
+ 
+-When done checking packs click **Generate Mod String**. Linux users that experience clipboard issues *may* need to run the Archipelago Launcher and JSON Generator through a command line to get the output there.
++Linux users that experience clipboard issues *may* need to run the Archipelago Launcher and JSON Generator through a command line to get the output there.
+ 
+-### Adding the output to your YAML
+-On the line for `megamix_mod_data` paste and format it as such:
+-```YAML
+-megamix_mod_data: '{"MyFirstSongPack":[["MyFirstSong",144,224]]}'
+-```
++It is recommended to regenerate the mod string when adding or updating packs.
+ 
+-It is recommended to regenerate the mod string when adding or updating packs. Individual songs can be excluded from the pool in the YAML's `exclude_songs` section.
++Individual songs can be excluded from the pool in the YAML's `exclude_songs` section.
+ 
+ ## Troubleshooting
+ 
+ ### Checks are not sending
+ Make sure the **Mega Mix Client** is open and connected to a room.
+ 
+-Try playing the BK song. If a success message does not appear on completion try restarting the **Mega Mix Client**.
++Play `-Archipelago Randomizer Enabled-`. If a success message does not appear in the **Client** on completion try restarting the **Client**.
+ 
+ ### There are songs outside my specified difficulty settings
+-To increase the success of seed generation the difficulty settings are conservatively expanded *until* a minimally viable song pool is found.
+-
+-If you do not like the results of the difficulty expansion consider less restrictive settings.
+-
+ Starting (`start_inventory`), Included (`include_songs`), and the Goal Song (`goal_song`) will *always* ignore difficulty settings.
+ 
++To increase the success of seed generation the difficulty settings are conservatively expanded *until* a minimally viable song pool is found. If you do not like the results of the difficulty expansion consider less restrictive settings.
++
+ ### My settings are too long or difficult
+ **Note: You can play any available difficulty for the same checks.**
+ 
+-In the [AP mod folder](#Resulting-basic-file-structure) open `results.json` with a text editor. If it does not exist play a song first.
++In the [AP mod folder](#resulting-basic-file-structure) open `results.json` with a text editor. If it does not exist play a song first.
+ 
+ Given `Song I Want To Beat [5678]`:
+ - Change the number after `pvId` to `5678` 
+@@ -80,12 +83,15 @@ Given `Song I Want To Beat [5678]`:
+ Save the file while the **Mega Mix Client** is open and connected.
+ 
+ ### Newly received songs are not appearing in game
+-While on the song list press ***F7*** or the defined `reload` key in the [mod's config](#Resulting-basic-file-structure) to reload the game. 
++While on the song list press ***F7*** or the defined `reload` key in the [mod's config](#resulting-basic-file-structure) to reload the game.
++
++Switch to the **All** filter in the song list and check each difficulty. Not every song is available on every difficulty.
+ 
+ ### Modded songs are not appearing in game
+-Install [ExPatch](#Optional-Quality-of-Life-Mods). Extreme/Extra Extreme only modded songs are common.
+ 
+-Similar to the [mod's config](#Resulting-basic-file-structure), ensure `enabled = true` in a pack's `config.toml`.
++Install [ExPatch](#optional-quality-of-life-mods). Modded songs are commonly Extreme/Extra Extreme only.
++
++Similar to the [mod's config](#resulting-basic-file-structure), ensure `enabled = true` in a pack's `config.toml`.
+ 
+ ### Songs still aren't appearing
+ Run `/restore_songs` in the **Mega Mix Client**, reload, and play manually (honor system).
+diff --git a/generator_megamix/generator.kv b/generator_megamix/generator.kv
+index dd470ca..7f60d97 100644
+--- a/generator_megamix/generator.kv
++++ b/generator_megamix/generator.kv
+@@ -28,8 +28,8 @@ MDBoxLayout:
+         spacing: "5dp"
+         padding: "10dp"
+ 
+-        MDGridLayout:
+-            cols: 1
++        MDBoxLayout:
++            orientation: "vertical"
+             size_hint_x: 1/3
+ 
+             MDButton:
+@@ -85,6 +85,16 @@ MDBoxLayout:
+                 MDButtonText:
+                     text: "Uncheck all viewable"
+ 
++            Widget:
++                size_hint_y: 1
++
++            MDButton:
++                on_release: app.open_help()
++                MDButtonIcon:
++                    icon: "help"
++                MDButtonText:
++                    text: "Help (GitHub)"
++
+         MDGridLayout:
+             rows: 2
+             spacing: "10dp"
+diff --git a/generator_megamix/generator.py b/generator_megamix/generator.py
+index 9a097ab..191425e 100644
+--- a/generator_megamix/generator.py
++++ b/generator_megamix/generator.py
+@@ -165,6 +165,10 @@ class DivaJSONGenerator(ThemedApp):
+     def open_mods_folder(self):
+         Utils.open_file(self.mods_folder)
+ 
++    @staticmethod
++    def open_help():
++        Utils.open_file("https://github.com/Cynichill/DivaAPworld/blob/main/docs/setup_en.md#mod-songs")
++
+     @staticmethod
+     def show_snackbar(message: str = "ooeeoo"):
+         MDSnackbar(MDSnackbarText(text=message)).open()
