@@ -1,8 +1,8 @@
 diff --git a/DataHandler.py b/DataHandler.py
-index f1fcbe2..f467496 100644
+index 5c8897e..a4eb4bf 100644
 --- a/DataHandler.py
 +++ b/DataHandler.py
-@@ -166,7 +166,7 @@ def remove_song(pv_db: str, songs: str) -> str:
+@@ -167,7 +167,7 @@ def remove_song(pv_db: str, songs: str) -> str:
      return re.sub(rf"^(pv_(?!(144|700)\.)({songs})\.difficulty\.(?:easy|normal|hard|extreme).length=\d)$", r"#ARCH#\g<1>", pv_db, flags=re.MULTILINE)
  
  
@@ -11,7 +11,7 @@ index f1fcbe2..f467496 100644
      """
      Extracts mod data from YAML files and converts it to a list of dictionaries.
      """
-@@ -176,42 +176,35 @@ def extract_mod_data_to_json() -> list[Any]:
+@@ -177,42 +177,35 @@ def extract_mod_data_to_json() -> list[Any]:
  
      logger.debug(f"Checking YAMLs for megamix_mod_data at {folder_path}")
  
@@ -46,7 +46,7 @@ index f1fcbe2..f467496 100644
 -                            matches = re.findall(mod_data_pattern, file_content)
 -
 -                            # Process each mod_data block
--                            for _ in matches:
+-                            if matches:
 -                                for single_yaml in yaml.safe_load_all(file_content):
 -                                    mod_data_content = single_yaml.get("Hatsune Miku Project Diva Mega Mix+", {}).get("megamix_mod_data", None)
 -
