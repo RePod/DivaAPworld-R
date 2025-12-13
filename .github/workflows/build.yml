@@ -72,6 +72,7 @@ jobs:
 
       - name: World | Zip
         run: |
+          jq --arg ver $(cat ./patches/VERSION) '.world_version = $ver' ./patches/archipelago.json
           rm -rf worlds/megamix/.git* worlds/megamix/*.yaml worlds/megamix/.idea worlds/megamix/sorted_mod_pv_db.txt worlds/megamix/docs
           find worlds/megamix/ -type d -iname '__pycache__' -exec rm -r {} +
           7z a -tzip -mm=deflate -mfb=256 -mx9 -mtc- -mta- -mtm- megamix.apworld ./worlds/megamix/
@@ -89,7 +90,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: github.event_name == 'workflow_dispatch'
         run: |
-          BASE=$(curl https://api.github.com/repos/Cynichill/DivaAPworld/releases | jq -cr '[.[] | select(.assets[].browser_download_url | endswith(".apworld"))][0].tag_name')
+          BASE=$(cat ./patches/VERSION)
           DATE=$(date +"%y%m%d") # T%H%M%S
           TAG=$(cd patches && git rev-parse --short HEAD)
           echo -e ":warning: THIS IS AN UNOFFICIAL VERSION OF THE WORLD, USUALLY WITH PENDING CHANGES TO TEST IN ADVANCE\n\nDiffs applied on upstream hash [${{ env.UPSTREAM_REF_APWORLD }}](https://github.com/Cynichill/DivaAPworld/tree/${{ env.UPSTREAM_REF_APWORLD }})" > newlines_hard.txt
