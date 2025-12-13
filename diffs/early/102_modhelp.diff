@@ -1,0 +1,47 @@
+diff --git a/generator_megamix/generator.kv b/generator_megamix/generator.kv
+index dd470ca..7f60d97 100644
+--- a/generator_megamix/generator.kv
++++ b/generator_megamix/generator.kv
+@@ -28,8 +28,8 @@ MDBoxLayout:
+         spacing: "5dp"
+         padding: "10dp"
+ 
+-        MDGridLayout:
+-            cols: 1
++        MDBoxLayout:
++            orientation: "vertical"
+             size_hint_x: 1/3
+ 
+             MDButton:
+@@ -85,6 +85,16 @@ MDBoxLayout:
+                 MDButtonText:
+                     text: "Uncheck all viewable"
+ 
++            Widget:
++                size_hint_y: 1
++
++            MDButton:
++                on_release: app.open_help()
++                MDButtonIcon:
++                    icon: "help"
++                MDButtonText:
++                    text: "Help (GitHub)"
++
+         MDGridLayout:
+             rows: 2
+             spacing: "10dp"
+diff --git a/generator_megamix/generator.py b/generator_megamix/generator.py
+index 9a097ab..191425e 100644
+--- a/generator_megamix/generator.py
++++ b/generator_megamix/generator.py
+@@ -165,6 +165,10 @@ class DivaJSONGenerator(ThemedApp):
+     def open_mods_folder(self):
+         Utils.open_file(self.mods_folder)
+ 
++    @staticmethod
++    def open_help():
++        Utils.open_file("https://github.com/Cynichill/DivaAPworld/blob/main/docs/setup_en.md#mod-songs")
++
+     @staticmethod
+     def show_snackbar(message: str = "ooeeoo"):
+         MDSnackbar(MDSnackbarText(text=message)).open()
