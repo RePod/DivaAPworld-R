@@ -735,16 +735,16 @@ index c26b97d..6a2769e 100644
  ### Resulting basic file structure
  ```
  Hatsune Miku Project DIVA Mega Mix Plus\
--Γö£ DivaMegaMix.exe <ΓöÇ game, select when prompted by Client/JSON generator
--Γö£ dinput8.dll <ΓöÇ mod loader
--Γö£ config.toml <ΓöÇ mod loader config (no need to edit)
-+Γö£ DivaMegaMix.exe   <ΓöÇ game, select if prompted by Client/JSON generator
-+Γö£ dinput8.dll       <ΓöÇ mod loader
-+Γö£ config.toml       <ΓöÇ mod loader config (no need to edit)
- Γöö mods\
-   Γöö ArchipelagoMod\ <ΓöÇ AP mod, currently required to be this name
--    Γöö config.toml <ΓöÇ AP mod config
-+    Γöö config.toml   <ΓöÇ AP mod config
+-├ DivaMegaMix.exe <─ game, select when prompted by Client/JSON generator
+-├ dinput8.dll <─ mod loader
+-├ config.toml <─ mod loader config (no need to edit)
++├ DivaMegaMix.exe   <─ game, select if prompted by Client/JSON generator
++├ dinput8.dll       <─ mod loader
++├ config.toml       <─ mod loader config (no need to edit)
+ └ mods\
+   └ ArchipelagoMod\ <─ AP mod, currently required to be this name
+-    └ config.toml <─ AP mod config
++    └ config.toml   <─ AP mod config
  ```
  
 -## Optional Quality of Life Mods
