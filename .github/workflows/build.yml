@@ -69,6 +69,10 @@ jobs:
       - name: World | General tests
         run: |
           uv run pytest test/general worlds/megamix
+          
+      - name: World | Update archipelago.json
+        run: |
+          PYTHONPATH=. uv run python worlds/megamix/.github/workflows/manifest.py
 
       - name: World | Zip
         run: |
