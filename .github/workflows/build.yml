@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  UPSTREAM_REF_APWORLD: fc114cbb2e082493ee52a25662bf1d7b1fc1ede5
-  UPSTREAM_REF_FUZZER: 433eeadc4bdbdc7302810e7d72a7f6435dcd1062
+  UPSTREAM_REF_APWORLD: 0d9ed236ba7bedd9dcdc89701ff506f6cc86a07b
+  UPSTREAM_REF_FUZZER: '0.5.1'
 
 jobs:
   build:
