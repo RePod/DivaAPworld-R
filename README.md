@@ -9,5 +9,5 @@ If the changes provided by UTB and the diffs applied by this Unofficial release 
 If an issue is encountered with this release that is not in the latest Official I do accept issues here and will forward/handle them upstream. If there's a relevant [open pull request](https://github.com/Cynichill/DivaAPworld/pulls) it would be better to report there.
 
 ### Resources
-- [Latest Unofficial Release](https://github.com/RePod/DivaAPworld-R/releases/latest) <sup>([Latest Official Release](https://github.com/Cynichill/DivaAPworld/releases/latest))</sup>
+- [Latest Unofficial Release](https://github.com/RePod/DivaAPworld-R/releases/latest) ([Latest Official Release](https://github.com/Cynichill/DivaAPworld/releases/latest))
 - [Compare latest Official Release and UTB.](https://github.com/Cynichill/DivaAPworld/compare/main...testing) Diffs are applied on top of [`UPSTREAM_REF_APWORLD`](.github/workflows/build.yml) UTB.
