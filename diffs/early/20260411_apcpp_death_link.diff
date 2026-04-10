@@ -1,0 +1,12 @@
+diff --git a/__init__.py b/__init__.py
+index 0524a1b..cabbff4 100644
+--- a/__init__.py
++++ b/__init__.py
+@@ -392,6 +392,7 @@ class MegaMixWorld(World):
+             "leekWinCount": self.get_leek_win_count(),
+             "scoreGradeNeeded": self.options.grade_needed.value,
+             "autoRemove": bool(self.options.auto_remove_songs),
++            "death_link": True, # APCpp requires this key name to set the tag. Toggled with in-game GUI.
+             "deathLink": self.options.death_link.value,
+             "deathLink_Amnesty": self.options.death_link_amnesty.value,
+             "modData": {pack: [[song[0], song[1]] for song in songs if song[1] in self.final_song_ids]
